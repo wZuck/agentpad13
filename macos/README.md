@@ -37,6 +37,24 @@ open 'macos/dist/AgentPad Studio.app' --args --demo
 按 macOS 提示允许 USB 配件或输入监控权限后重新打开应用。
 产品 VID/PID 是实验身份，不用于普通 Vial 固件，也无法仅凭此身份区分其他仿真设备，连接前应核对设备。
 
+## PCB 位置与视角
+
+界面采用 `release/hardware/pcb/v5_8.kicad_pcb` 的正面俯视坐标：USB 朝上，x 向右、y 向下，
+外形为 84.2 × 100 mm 的原始倒角轮廓。所有控件按同一比例缩放，不按屏幕栅格重新排列。
+编码器在左上，摇杆在右上；SW1–SW12 是 3×4 矩阵，底部 SW13 2U 键居中，TP5 在其左侧。
+背面 SW14 / SW15 仅作为虚线位置标记，不能分配 Codex 动作。
+
+坐标由 `scripts/generate-layout.py` 从当前 PCB 提取，输出到 `PhysicalLayout.swift`。
+RE1 使用机械轴心（footprint 锚点加上 CAD 定义的 `(7.5, 2.5)` 偏移），避免误把 pin A 当作旋钮中心。
+按键轮廓示意 1U / 2U 键帽大小，中心位置取自 PCB；并非开关焊盘或键帽生产尺寸图。
+
+```sh
+python3 macos/scripts/generate-layout.py         # PCB 更新后重新生成
+python3 macos/scripts/generate-layout.py --check # 检查 UI 坐标是否过期
+```
+
+打包脚本会自动检查坐标一致性；运行已构建的应用不需要 Python。
+
 ## 固件能力边界
 
 - 通过 `v.oai.keymap.get/set`，只操作 `l:0`。不发送 rgbcfg/thstatus 握手，不覆盖 Codex 的 LED/任务状态。

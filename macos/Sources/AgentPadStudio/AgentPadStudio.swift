@@ -83,56 +83,87 @@ struct StudioView: View {
         }.disabled(model.busy).padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 22)
     }
     private var board: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("AGENTPAD / 13").font(.system(size: 12, weight: .bold, design: .monospaced))
-                    Text("CODEX OAI EDITION").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
-                }
+                Text("PCB v5.8 · 正面俯视").font(.caption)
                 Spacer()
-                Image(systemName: "circle.circle").font(.system(size: 36)).foregroundStyle(.secondary)
-                VStack(alignment: .leading) {
-                    Text("ENC").font(.caption.bold())
-                    Text("按压 · 固定动作").font(.system(size: 10)).foregroundStyle(.secondary)
-                }
-            }.padding(.bottom, 8)
-            ForEach(0..<3) { row in
-                HStack(spacing: 12) {
-                    ForEach(0..<4) { column in key(row * 4 + column) }
+                Text("USB ↑").font(.system(size: 11, design: .monospaced))
+            }.foregroundStyle(.secondary)
+            GeometryReader { geometry in
+                let scale = geometry.size.width / PhysicalLayout.width
+                ZStack(alignment: .topLeading) {
+                    PCBOutline().fill(Color(white: 0.12))
+                    PCBOutline().stroke(.white.opacity(0.15), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.white.opacity(0.25))
+                        .frame(width: 9 * scale, height: 3 * scale)
+                        .position(x: PhysicalLayout.usb.x * scale, y: PhysicalLayout.usb.y * scale)
+                    Text("AGENTPAD / 13")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .position(x: 42.1 * scale, y: 13 * scale)
+                    fixedControl("ENC", symbol: "circle.circle", diameter: 17.5 * scale)
+                        .position(x: PhysicalLayout.encoder.x * scale, y: PhysicalLayout.encoder.y * scale)
+                        .help("RE1 · 编码器按压固定为 ENC；旋转调整推理强度")
+                    fixedControl("JS1", symbol: "plus", diameter: 14 * scale)
+                        .position(x: PhysicalLayout.joystick.x * scale, y: PhysicalLayout.joystick.y * scale)
+                        .help("JS1 · 摇杆；默认左右切换会话")
+                    ForEach(0..<13) { index in
+                        let center = PhysicalLayout.switches[index]
+                        key(index, scale: scale)
+                            .frame(width: (index == 12 ? 36.55 : 17.5) * scale, height: 17.5 * scale)
+                            .position(x: center.x * scale, y: center.y * scale)
+                    }
+                    fixedControl("TP5", symbol: "hand.tap", diameter: 14 * scale)
+                        .position(x: PhysicalLayout.touch.x * scale, y: PhysicalLayout.touch.y * scale)
+                        .help("TP5 · 固定循环切换 CODEX / FN / NAV / MEDIA")
+                    serviceMark("BOOT", diameter: 6 * scale)
+                        .position(x: PhysicalLayout.boot.x * scale, y: PhysicalLayout.boot.y * scale)
+                        .help("背面 SW14 · BOOT / 摇杆校准，不是可映射键")
+                    serviceMark("RESET", diameter: 6 * scale)
+                        .position(x: PhysicalLayout.reset.x * scale, y: PhysicalLayout.reset.y * scale)
+                        .help("背面 SW15 · 硬件 RESET，不是可映射键")
                 }
             }
-            HStack(spacing: 12) {
-                key(12).frame(maxWidth: .infinity)
-                VStack(spacing: 5) {
-                    Image(systemName: "hand.tap").font(.title3)
-                    Text("TP5 · 切换层").font(.caption)
-                }.foregroundStyle(.secondary).frame(maxWidth: .infinity).frame(height: 72)
-                VStack(spacing: 5) {
-                    Image(systemName: "plus.circle").font(.title3)
-                    Text("摇杆 · 会话切换¹").font(.caption)
-                }.foregroundStyle(.secondary).frame(maxWidth: .infinity).frame(height: 72)
-            }
-        }
-        .padding(22)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color(white: 0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.10)))
+            .aspectRatio(PhysicalLayout.width / PhysicalLayout.height, contentMode: .fit)
+            Text("按 PCB 毫米坐标等比绘制 · 虚线标记为背面 BOOT / RESET")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }.frame(maxWidth: 370).frame(maxWidth: .infinity)
     }
-    private func key(_ index: Int) -> some View {
+    private func fixedControl(_ name: String, symbol: String, diameter: Double) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: symbol).font(.system(size: diameter * 0.23))
+            Text(name).font(.system(size: max(8, diameter * 0.13), weight: .medium, design: .monospaced))
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: diameter, height: diameter)
+        .background(Circle().fill(.white.opacity(0.035)))
+        .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
+    }
+    private func serviceMark(_ name: String, diameter: Double) -> some View {
+        Text(name).font(.system(size: 6, design: .monospaced)).foregroundStyle(.secondary)
+            .frame(width: diameter, height: diameter)
+            .overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.2), style: StrokeStyle(dash: [3, 2])))
+    }
+    private func key(_ index: Int, scale: Double) -> some View {
         let action = PadAction.all[model.map.values[index]]
         let active = model.selected == index
         return Button { model.selected = index } label: {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text(String(format: "K%02d", index)).font(.system(size: 10, design: .monospaced)).foregroundStyle(active ? accent : .gray)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 0) {
+                    Text("SW\(index + 1)").font(.system(size: max(8, 1.7 * scale), design: .monospaced)).foregroundStyle(active ? accent : .gray)
                     Spacer(minLength: 0)
                     Circle().fill(index < 6 ? accent.opacity(0.65) : .white.opacity(0.45)).frame(width: 4, height: 4)
                 }
-                Text(action.title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
-                Text(action.wire.components(separatedBy: " · ").first ?? "").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
-            }.padding(11).frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(active ? accent.opacity(0.10) : .white.opacity(0.045)))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(active ? accent : .white.opacity(0.09), lineWidth: active ? 1.5 : 1))
+                Text(action.title).font(.system(size: max(10, 2.1 * scale), weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                Text(String(format: "K%02d", index) + " · " + (action.wire.components(separatedBy: " · ").first ?? ""))
+                    .font(.system(size: max(8, 1.5 * scale), design: .monospaced)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+            }.padding(8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 9).fill(active ? accent.opacity(0.10) : .white.opacity(0.045)))
+                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(active ? accent : .white.opacity(0.09), lineWidth: active ? 1.5 : 1))
+                .contentShape(RoundedRectangle(cornerRadius: 9))
         }.buttonStyle(.plain).disabled(model.busy)
+        .help("SW\(index + 1) · K\(String(format: "%02d", index)) · \(action.title)")
     }
     private var inspector: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -185,5 +216,21 @@ struct StudioView: View {
                     .buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(!model.canSave)
             }.disabled(model.busy)
         }.padding(22)
+    }
+}
+
+// Use the PCB's actual asymmetric chamfers rather than a generic rounded case.
+private struct PCBOutline: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let points = PhysicalLayout.outline.map {
+            CGPoint(x: $0.x / PhysicalLayout.width * rect.width,
+                    y: $0.y / PhysicalLayout.height * rect.height)
+        }
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        for point in points.dropFirst() { path.addLine(to: point) }
+        path.closeSubpath()
+        return path
     }
 }

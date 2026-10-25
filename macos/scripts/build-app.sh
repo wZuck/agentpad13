@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 scripts/generate-layout.py --check
 swift build -c release
 bundle="$PWD/dist/AgentPad Studio.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
