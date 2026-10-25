@@ -3,9 +3,9 @@
 `codex-oai-emulator.json` is the current emulator capture for
 `release/firmware/prebuilt/agentpad13_codex_oai.uf2`. It was regenerated from
 this checkout and must match the UF2 SHA-256 and byte size recorded in
-`codex-oai-current-manifest.json`. The current port rebuild is 91,648 bytes
+`codex-oai-current-manifest.json`. The current port rebuild is 93,184 bytes
 with SHA-256
-`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
+`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
 
 Two earlier provenance layers remain explicit:
 

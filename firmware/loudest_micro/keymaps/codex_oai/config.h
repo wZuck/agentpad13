@@ -15,7 +15,7 @@
 
 #define VENDOR_ID 0x303A
 #define PRODUCT_ID 0x8360
-#define DEVICE_VER 0x0005
+#define DEVICE_VER 0x000E
 #define MANUFACTURER "hirlu"
 #define PRODUCT "Codex Micro Lab OAI LED"
 
@@ -23,6 +23,17 @@
 #define RAW_USAGE_ID 0x61
 #define RAW_EPSIZE 64
 #define RAW_REPORT_ID 6
+
+/* The joystick acts as a pointer on the CODEX layer; FN+SW1 cycles modes. */
+#define CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+#define CODEX_OAI_JOYSTICK_MOUSE_LAYER 0
+#define CODEX_OAI_JOYSTICK_SWAP_XY
+#define CODEX_OAI_MOUSE_EXTRA_DEADZONE 200
+
+/* Keep pointer control deliberately slow enough for precise UI selection. */
+#define MOUSEKEY_MOVE_DELTA 1
+#define MOUSEKEY_MAX_SPEED 20
+#define MOUSEKEY_INTERVAL 20
 
 /* K00 / physical [0,0] enters the normal QMK bootmagic-lite path. */
 #define BOOTMAGIC_LITE_ROW 0

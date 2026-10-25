@@ -41,7 +41,7 @@ class KeymapContractTest(unittest.TestCase):
         for name, definition in (
             ("VENDOR_ID", "#define VENDOR_ID 0x303A"),
             ("PRODUCT_ID", "#define PRODUCT_ID 0x8360"),
-            ("DEVICE_VER", "#define DEVICE_VER 0x0005"),
+            ("DEVICE_VER", "#define DEVICE_VER 0x000E"),
             ("MANUFACTURER", "#define MANUFACTURER \"hirlu\""),
             ("PRODUCT", "#define PRODUCT \"Codex Micro Lab OAI LED\""),
             ("RAW_USAGE_PAGE", "#define RAW_USAGE_PAGE 0xFF00"),
@@ -207,21 +207,52 @@ class KeymapContractTest(unittest.TestCase):
         body = encoder.group(1)
 
         expected_mappings = {
-            "FN scroll": "tap_code16(clockwise ? KC_WH_U : KC_WH_D);",
-            "NAV paging": "tap_code16(clockwise ? KC_PGUP : KC_PGDN);",
-            "MEDIA volume": "tap_code16(clockwise ? KC_VOLD : KC_VOLU);",
+            "FN scroll": "tap_code16(clockwise ? KC_WH_D : KC_WH_U);",
+            "NAV paging": "tap_code16(clockwise ? KC_PGDN : KC_PGUP);",
+            "MEDIA volume": "tap_code16(clockwise ? KC_VOLU : KC_VOLD);",
             "OAI notification": (
-                "codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CCW : "
-                "OAI_CONTROL_ENCODER_CW, true)"
+                "codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CW : "
+                "OAI_CONTROL_ENCODER_CCW, true)"
             ),
             "native fallback": (
-                "native_action(clockwise ? CX_ACTION_REASONING_DOWN : "
-                "CX_ACTION_REASONING_UP);"
+                "native_action(clockwise ? CX_ACTION_REASONING_UP : "
+                "CX_ACTION_REASONING_DOWN);"
             ),
         }
         for mapping, source in expected_mappings.items():
             with self.subTest(mapping=mapping):
                 self.assertIn(source, body)
+
+    def test_codex_layer_joystick_defaults_to_mouse_pointer(self) -> None:
+        config = (REPO / "firmware" / "loudest_micro" / "keymaps" / "codex_oai" / "config.h").read_text()
+        source = (REPO / "firmware" / "loudest_micro" / "loudest_micro.c").read_text()
+
+        self.assertIn("#define CODEX_OAI_DEFAULT_JOYSTICK_MOUSE", config)
+        self.assertIn("#define CODEX_OAI_JOYSTICK_MOUSE_LAYER 0", config)
+        self.assertIn("#define CODEX_OAI_JOYSTICK_SWAP_XY", config)
+        self.assertIn("#define CODEX_OAI_MOUSE_EXTRA_DEADZONE 200", config)
+        self.assertIn("#define MOUSEKEY_MOVE_DELTA 1", config)
+        self.assertIn("#define MOUSEKEY_MAX_SPEED 20", config)
+        self.assertIn("#define MOUSEKEY_INTERVAL 20", config)
+        self.assertIn("QK_MOUSE_CURSOR_UP", source)
+        self.assertIn("QK_MOUSE_CURSOR_DOWN", source)
+        self.assertIn("QK_MOUSE_CURSOR_LEFT", source)
+        self.assertIn("QK_MOUSE_CURSOR_RIGHT", source)
+        self.assertIn("js_mode == JS_MODE_MOUSE", source)
+        self.assertIn("mousekey_on(js_mouse_kc[i])", source)
+        self.assertIn("mousekey_off(js_mouse_kc[i])", source)
+        self.assertIn("} else if (!want[i]) {\n            mousekey_off(js_mouse_kc[i]);", source)
+        self.assertIn("JS_MOUSE_SETTLE_MS 300", source)
+        self.assertIn("js_mouse_armed", source)
+        self.assertIn("*x           = raw_y;", source)
+        self.assertIn("*y           = raw_x;", source)
+        self.assertIn("want[0] = (y > center_y + active_threshold_y);", source)
+        self.assertIn("want[1] = (y < center_y - active_threshold_y);", source)
+        self.assertIn("want[2] = (x > center_x + active_threshold_x);", source)
+        self.assertIn("want[3] = (x < center_x - active_threshold_x);", source)
+        self.assertIn("mouse_threshold_x = threshold_x + CODEX_OAI_MOUSE_EXTRA_DEADZONE;", source)
+        self.assertIn("release_threshold_x = (mouse_threshold_x * 3) / 4;", source)
+        self.assertIn("!loudest_joystick_is_deflected()", self.keymap)
 
     def test_native_fallback_and_safety_contract(self) -> None:
         for token in (
@@ -232,7 +263,7 @@ class KeymapContractTest(unittest.TestCase):
             "codex_armed",
             "clear_codex_arm",
             "CX_ACTION_TERMINAL",
-            "native_action(clockwise ? CX_ACTION_REASONING_DOWN : CX_ACTION_REASONING_UP)",
+            "native_action(clockwise ? CX_ACTION_REASONING_UP : CX_ACTION_REASONING_DOWN)",
             "native_action(CX_ACTION_SEND)",
             "codex_oai_notify(OAI_CONTROL_ACT10, true)",
             "codex_oai_handshake_revision()",

@@ -1,16 +1,16 @@
 {
-  "elf_sha256": "c88507f5e9ee0061f1762c4b51064b3afb89b4d44dea4d77e3738867ce8925ba",
+  "elf_sha256": "50714d3cfe404546be28b80f4cb91990ade58723de712452ff65e2058a13af90",
   "elf_size": {
     "bss": 265192,
     "data": 0,
-    "text": 45736
+    "text": 46492
   },
   "elf_uf2_equivalence": {
-    "elf_binary_size_bytes": 45736,
+    "elf_binary_size_bytes": 46492,
     "flash_base": "0x10000000",
     "status": "pass",
-    "trailing_zero_padding_bytes": 88,
-    "uf2_flash_size_bytes": 45824
+    "trailing_zero_padding_bytes": 100,
+    "uf2_flash_size_bytes": 46592
   },
   "emulator_evidence": {
     "descriptor_verified": true,
@@ -24,8 +24,8 @@
     "rgbcfg_ack": true,
     "task_status_fragment_count": 2,
     "thstatus_ack": true,
-    "uf2_sha256": "2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba",
-    "uf2_size_bytes": 91648,
+    "uf2_sha256": "46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20",
+    "uf2_size_bytes": 93184,
     "usb_enumerated": true,
     "ws2812_activity": true
   },
@@ -37,8 +37,8 @@
     "encoder_update_user",
     "raw_hid_receive"
   ],
-  "sha256": "2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba",
-  "size_bytes": 91648,
+  "sha256": "46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20",
+  "size_bytes": 93184,
   "status": "pass",
   "target": "loudest_micro:codex_oai",
   "usage": "ff00:0061",

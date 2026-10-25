@@ -469,28 +469,135 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 // ---------------------------------------------------------------------------
 // Joystick modes. Native QMK exposes GP26/GP27 as a HID gamepad; the arrow
 // (8-way) and scroll modes are custom code reading analogReadPin. JS_MODE
-// cycles gamepad -> arrows -> scroll. All three now share ONE calibration
-// source: the per-axis js_center_* / js_threshold_* derived above from the
-// EEPROM store (protocol v1), which fall back to the 512/300 placeholders on an
-// uncalibrated board. (Before 2026-08-15 the arrow/scroll paths used the
-// compile-time JS_CENTER/JS_THRESHOLD directly and were marked
-// CALIBRATION-PENDING; those two defines are now the fallback and live with the
-// calibration store.)
+// cycles gamepad -> arrows -> scroll, with an optional mouse-pointer mode for
+// the Codex OAI keymap. All modes share ONE calibration source: the per-axis
+// js_center_* / js_threshold_* derived above from the EEPROM store (protocol
+// v1), which fall back to the 512/300 placeholders on an uncalibrated board.
 // ---------------------------------------------------------------------------
 enum js_mode {
     JS_MODE_GAMEPAD = 0,
     JS_MODE_ARROWS,
     JS_MODE_SCROLL,
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+    JS_MODE_MOUSE,
+#endif
     JS_MODE_COUNT,
 };
 
 #define JS_SCROLL_INTERVAL_MS 120
 
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+static uint8_t js_mode = JS_MODE_MOUSE;
+#else
 static uint8_t js_mode = JS_MODE_GAMEPAD;
+#endif
+
+static void js_read_physical_axes(int16_t *x, int16_t *y, int16_t *center_x, int16_t *center_y, int16_t *threshold_x, int16_t *threshold_y) {
+    int16_t raw_x = analogReadPin(GP26);
+    int16_t raw_y = analogReadPin(GP27);
+#ifdef CODEX_OAI_JOYSTICK_SWAP_XY
+    *x           = raw_y;
+    *y           = raw_x;
+    *center_x    = js_center_y;
+    *center_y    = js_center_x;
+    *threshold_x = js_threshold_y;
+    *threshold_y = js_threshold_x;
+#else
+    *x           = raw_x;
+    *y           = raw_y;
+    *center_x    = js_center_x;
+    *center_y    = js_center_y;
+    *threshold_x = js_threshold_x;
+    *threshold_y = js_threshold_y;
+#endif
+}
 
 // arrow order: up, down, left, right
 static const uint16_t js_arrow_kc[4] = {KC_UP, KC_DOWN, KC_LEFT, KC_RIGHT};
 static bool           js_arrow_held[4];
+
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+#    define JS_MOUSE_SETTLE_MS 300
+
+static const uint8_t js_mouse_kc[4] = {
+    QK_MOUSE_CURSOR_UP,
+    QK_MOUSE_CURSOR_DOWN,
+    QK_MOUSE_CURSOR_LEFT,
+    QK_MOUSE_CURSOR_RIGHT,
+};
+static bool    js_mouse_held[4];
+static uint8_t js_mouse_accel_code;
+static bool    js_mouse_armed;
+static uint32_t js_mouse_center_since;
+
+static void js_release_mouse(void) {
+    for (uint8_t i = 0; i < 4; i++) {
+        if (js_mouse_held[i]) {
+            mousekey_off(js_mouse_kc[i]);
+            js_mouse_held[i] = false;
+        }
+    }
+    if (js_mouse_accel_code != 0) {
+        mousekey_off(js_mouse_accel_code);
+        js_mouse_accel_code = 0;
+    }
+}
+
+static void js_mouse_set_accel(uint8_t code) {
+    if (code == js_mouse_accel_code) {
+        return;
+    }
+    if (js_mouse_accel_code != 0) {
+        mousekey_off(js_mouse_accel_code);
+    }
+    js_mouse_accel_code = code;
+    if (js_mouse_accel_code != 0) {
+        mousekey_on(js_mouse_accel_code);
+    }
+}
+static int16_t js_abs_delta(int16_t value) {
+    return value < 0 ? (int16_t)-value : value;
+}
+
+static void js_mouse_update(const bool want[4], int16_t max_delta, int16_t threshold) {
+    if (!want[0] && !want[1] && !want[2] && !want[3]) {
+        if (!js_mouse_armed) {
+            uint32_t now = timer_read32();
+            if (js_mouse_center_since == 0) {
+                js_mouse_center_since = now == 0 ? 1 : now;
+            } else if (timer_elapsed32(js_mouse_center_since) >= JS_MOUSE_SETTLE_MS) {
+                js_mouse_armed = true;
+            }
+        }
+        js_release_mouse();
+        return;
+    }
+
+    if (!js_mouse_armed) {
+        js_mouse_center_since = 0;
+        js_release_mouse();
+        return;
+    }
+
+    uint8_t accel = QK_MOUSE_ACCELERATION_0;
+    if (max_delta > threshold + threshold / 2) {
+        accel = QK_MOUSE_ACCELERATION_2;
+    } else if (max_delta > threshold + threshold / 4) {
+        accel = QK_MOUSE_ACCELERATION_1;
+    }
+    js_mouse_set_accel(accel);
+
+    for (uint8_t i = 0; i < 4; i++) {
+        if (want[i] && !js_mouse_held[i]) {
+            mousekey_on(js_mouse_kc[i]);
+            js_mouse_held[i] = true;
+        } else if (!want[i]) {
+            mousekey_off(js_mouse_kc[i]);
+            js_mouse_held[i] = false;
+        }
+    }
+}
+#endif
 
 static void js_release_arrows(void) {
     for (uint8_t i = 0; i < 4; i++) {
@@ -503,7 +610,29 @@ static void js_release_arrows(void) {
 
 static void js_cycle_mode(void) {
     js_release_arrows();
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+    js_release_mouse();
+    js_mouse_armed        = false;
+    js_mouse_center_since = 0;
+    switch (js_mode) {
+        case JS_MODE_MOUSE: js_mode = JS_MODE_ARROWS; break;
+        case JS_MODE_ARROWS: js_mode = JS_MODE_SCROLL; break;
+        case JS_MODE_SCROLL: js_mode = JS_MODE_GAMEPAD; break;
+        default: js_mode = JS_MODE_MOUSE; break;
+    }
+#else
     js_mode = (js_mode + 1) % JS_MODE_COUNT;
+#endif
+}
+
+bool loudest_joystick_is_deflected(void) {
+    int16_t x, y, center_x, center_y, threshold_x, threshold_y;
+    js_read_physical_axes(&x, &y, &center_x, &center_y, &threshold_x, &threshold_y);
+#ifdef CODEX_OAI_MOUSE_EXTRA_DEADZONE
+    threshold_x = threshold_x > 512 - CODEX_OAI_MOUSE_EXTRA_DEADZONE ? 512 - CODEX_OAI_MOUSE_EXTRA_DEADZONE : threshold_x + CODEX_OAI_MOUSE_EXTRA_DEADZONE;
+    threshold_y = threshold_y > 512 - CODEX_OAI_MOUSE_EXTRA_DEADZONE ? 512 - CODEX_OAI_MOUSE_EXTRA_DEADZONE : threshold_y + CODEX_OAI_MOUSE_EXTRA_DEADZONE;
+#endif
+    return x < center_x - threshold_x || x > center_x + threshold_x || y < center_y - threshold_y || y > center_y + threshold_y;
 }
 
 // ===========================================================================
@@ -918,16 +1047,23 @@ void housekeeping_task_kb(void) {
     // touch pad and the encoder keep working normally for the whole routine,
     // and the native HID gamepad keeps reporting (it is a gamepad; the stick
     // moving is exactly what it is for).
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+    if (selfcal_state != SELFCAL_IDLE || js_mode != JS_MODE_MOUSE || get_highest_layer(layer_state | default_layer_state) != CODEX_OAI_JOYSTICK_MOUSE_LAYER) {
+        js_release_mouse();
+        js_mouse_armed        = false;
+        js_mouse_center_since = 0;
+    }
+#endif
     if (js_mode != JS_MODE_GAMEPAD && selfcal_state == SELFCAL_IDLE) {
-        int16_t x = analogReadPin(GP26);
-        int16_t y = analogReadPin(GP27);
+        int16_t x, y, center_x, center_y, threshold_x, threshold_y;
+        js_read_physical_axes(&x, &y, &center_x, &center_y, &threshold_x, &threshold_y);
 
         if (js_mode == JS_MODE_ARROWS) {
             bool want[4];
-            want[0] = (y < js_center_y - js_threshold_y); // up
-            want[1] = (y > js_center_y + js_threshold_y); // down
-            want[2] = (x < js_center_x - js_threshold_x); // left
-            want[3] = (x > js_center_x + js_threshold_x); // right
+            want[0] = (y > center_y + threshold_y); // up
+            want[1] = (y < center_y - threshold_y); // down
+            want[2] = (x > center_x + threshold_x); // left
+            want[3] = (x < center_x - threshold_x); // right
             for (uint8_t i = 0; i < 4; i++) {
                 if (want[i] && !js_arrow_held[i]) {
                     register_code16(js_arrow_kc[i]);
@@ -941,13 +1077,13 @@ void housekeeping_task_kb(void) {
             static uint32_t last_scroll = 0;
             if (timer_elapsed32(last_scroll) >= JS_SCROLL_INTERVAL_MS) {
                 uint16_t wheel = KC_NO;
-                if (y < js_center_y - js_threshold_y) {
+                if (y > center_y + threshold_y) {
                     wheel = KC_WH_U;
-                } else if (y > js_center_y + js_threshold_y) {
+                } else if (y < center_y - threshold_y) {
                     wheel = KC_WH_D;
-                } else if (x < js_center_x - js_threshold_x) {
+                } else if (x > center_x + threshold_x) {
                     wheel = KC_WH_L;
-                } else if (x > js_center_x + js_threshold_x) {
+                } else if (x < center_x - threshold_x) {
                     wheel = KC_WH_R;
                 }
                 if (wheel != KC_NO) {
@@ -955,6 +1091,27 @@ void housekeeping_task_kb(void) {
                     last_scroll = timer_read32();
                 }
             }
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
+        } else if (js_mode == JS_MODE_MOUSE && get_highest_layer(layer_state | default_layer_state) == CODEX_OAI_JOYSTICK_MOUSE_LAYER) {
+            int16_t mouse_threshold_x = threshold_x + CODEX_OAI_MOUSE_EXTRA_DEADZONE;
+            int16_t mouse_threshold_y = threshold_y + CODEX_OAI_MOUSE_EXTRA_DEADZONE;
+            mouse_threshold_x = mouse_threshold_x > 512 ? 512 : mouse_threshold_x;
+            mouse_threshold_y = mouse_threshold_y > 512 ? 512 : mouse_threshold_y;
+            int16_t release_threshold_x = (mouse_threshold_x * 3) / 4;
+            int16_t release_threshold_y = (mouse_threshold_y * 3) / 4;
+            int16_t active_threshold_x = js_mouse_held[2] || js_mouse_held[3] ? release_threshold_x : mouse_threshold_x;
+            int16_t active_threshold_y = js_mouse_held[0] || js_mouse_held[1] ? release_threshold_y : mouse_threshold_y;
+            bool    want[4];
+            want[0] = (y > center_y + active_threshold_y);
+            want[1] = (y < center_y - active_threshold_y);
+            want[2] = (x > center_x + active_threshold_x);
+            want[3] = (x < center_x - active_threshold_x);
+            int16_t max_delta = js_abs_delta(x - center_x) > js_abs_delta(y - center_y)
+                                    ? js_abs_delta(x - center_x)
+                                    : js_abs_delta(y - center_y);
+            int16_t speed_threshold = threshold_x > threshold_y ? threshold_x : threshold_y;
+            js_mouse_update(want, max_delta, speed_threshold);
+#endif
         }
     }
 

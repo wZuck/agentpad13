@@ -26,9 +26,9 @@ recovery. No physical check is PASS until a person has observed it on the
 board.
 
 Current build candidate:
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `91648` bytes,
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `93184` bytes,
 SHA-256
-`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
+`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
 
 ## Pre-flight, manual only
 

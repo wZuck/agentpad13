@@ -445,7 +445,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
              * startup sweep is the deliberate input-free interval, so ignore
              * it rather than letting that edge cycle a fresh CODEX boot to
              * FN. */
-            if (pressed && !codex_led_startup_active(timer_read32())) {
+            if (pressed && !codex_led_startup_active(timer_read32()) && !loudest_joystick_is_deflected()) {
                 cycle_codex_layer();
             }
             return false;
@@ -460,19 +460,19 @@ CODEX_OAI_KEEP bool encoder_update_user(uint8_t index, bool clockwise) {
     }
     switch (get_highest_layer(layer_state | default_layer_state)) {
         case L_FN:
-            tap_code16(clockwise ? KC_WH_U : KC_WH_D);
+            tap_code16(clockwise ? KC_WH_D : KC_WH_U);
             break;
         case L_USER2:
-            tap_code16(clockwise ? KC_PGUP : KC_PGDN);
+            tap_code16(clockwise ? KC_PGDN : KC_PGUP);
             break;
         case L_USER3:
-            tap_code16(clockwise ? KC_VOLD : KC_VOLU);
+            tap_code16(clockwise ? KC_VOLU : KC_VOLD);
             break;
         default:
             if (codex_oai_ready()) {
-                (void)codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CCW : OAI_CONTROL_ENCODER_CW, true);
+                (void)codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CW : OAI_CONTROL_ENCODER_CCW, true);
             } else {
-                native_action(clockwise ? CX_ACTION_REASONING_DOWN : CX_ACTION_REASONING_UP);
+                native_action(clockwise ? CX_ACTION_REASONING_UP : CX_ACTION_REASONING_DOWN);
             }
             break;
     }

@@ -61,8 +61,8 @@ locked `Codex Micro Lab OAI LED` identity (`303A:8360`, usage `FF00:61`, Report
 ID 6, 64-byte reports).
 
 The current artifact is
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 91,648 bytes, SHA-256
-`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 93,184 bytes, SHA-256
+`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
 Start with the [keymap contract](firmware/loudest_micro/keymaps/codex_oai/README.md),
 [source hand-off](firmware/CODEX-OAI-SOURCE.md), and
 [Direct OAI build procedure](firmware/BUILD.md#agentpad13-direct-oai-experimental-alternative).

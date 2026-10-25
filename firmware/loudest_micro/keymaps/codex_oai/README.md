@@ -12,7 +12,7 @@ The keymap intentionally reproduces the local Codex Micro OAI LED endpoint:
 |---|---|
 | VID:PID | `303A:8360` |
 | Manufacturer / product | `hirlu` / `Codex Micro Lab OAI LED` |
-| Device version | `0x0005` |
+| Device version | `0x000E` |
 | Raw HID usage | `FF00:61` |
 | Report format | Report ID 6; 64 bytes total |
 
@@ -120,7 +120,7 @@ replace the OAI map at startup.
 
 | Layer | Grid defaults | Hero / encoder / touch |
 |---|---|---|
-| `CODEX` | OAI controls below | `SEND` / OAI `ENC` / TP5 layer cycle |
+| `CODEX` | OAI controls below; joystick is a mouse pointer | `SEND` / OAI `ENC` / TP5 layer cycle |
 | `FN` | `JS_MODE`, F2–F12 | media play / OAI `ENC` / TP5 layer cycle |
 | `NAV` | Escape, home/end, arrows, paging and editing | OAI `ENC` / TP5 cycle / `TP_TOG` |
 | `MEDIA` | media, volume and RGB controls | OAI `ENC` / TP5 layer cycle |
@@ -131,6 +131,12 @@ Additional extension layers remain compile-time opt-in through
 `CODEX_EXTRA_LAYERS` (up to the three declared extension rows). `TP_TOG` lives on
 NAV so touch can be re-enabled after it has been disabled; TP5 itself remains
 the layer-cycle gesture while enabled.
+
+The CODEX layer defaults the joystick to relative mouse-pointer movement.
+Pushing farther from centre shortens the movement interval, and releasing the
+stick stops the pointer. FN-layer SW1 (`JS_MODE`) cycles
+`mouse -> arrows -> scroll -> gamepad`; calibration remains the same shared
+EEPROM store used by every joystick mode.
 
 Before the OAI handshake is ready, CODEX controls fall back to the proven
 native Codex shortcuts: AG00/AG01 previous/next, AG02 new task, AG03 review,
@@ -226,8 +232,8 @@ requires Vial-QMK commit `00fc4627`, the local VIA pre-hook and Raw HID
 Report-ID patches, initialized submodules, and Arm GNU Toolchain 15.2.Rel1. It
 publishes only
 [`release/firmware/prebuilt/agentpad13_codex_oai.uf2`](../../../../release/firmware/prebuilt/agentpad13_codex_oai.uf2)
-after clean builds pass. The current candidate is 91,648 bytes with SHA-256
-`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
+after clean builds pass. The current candidate is 93,184 bytes with SHA-256
+`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
 
 Run the complete host gate from the repository root with
 `python3 -m unittest discover -s firmware/tests/codex_oai -p 'test_*.py'`.
