@@ -168,8 +168,8 @@ python3 firmware/tools/build_codex_oai.py \
 ```
 
 The current output is
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 93,696 bytes, SHA-256
-`fcb50b2419419be43b7cf90b00a96b16063fcaf182bc24b9642d57e2e8adf54d`.
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 91,648 bytes, SHA-256
+`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
 Run the complete host and emulator gates from the repository root:
 
 ```sh

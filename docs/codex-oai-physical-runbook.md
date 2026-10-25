@@ -25,10 +25,10 @@ number requires a new approval. Keep the normal AgentPad13 UF2 available for
 recovery. No physical check is PASS until a person has observed it on the
 board.
 
-Current build candidate (still unflashed):
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `93696` bytes,
+Current build candidate:
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `91648` bytes,
 SHA-256
-`fcb50b2419419be43b7cf90b00a96b16063fcaf182bc24b9642d57e2e8adf54d`.
+`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
 
 ## Pre-flight, manual only
 

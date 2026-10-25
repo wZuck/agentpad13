@@ -60,9 +60,9 @@ this target directly—no helper, daemon, bridge, or Vial protocol—using the
 locked `Codex Micro Lab OAI LED` identity (`303A:8360`, usage `FF00:61`, Report
 ID 6, 64-byte reports).
 
-The current unflashed candidate is
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 93,696 bytes, SHA-256
-`fcb50b2419419be43b7cf90b00a96b16063fcaf182bc24b9642d57e2e8adf54d`.
+The current artifact is
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 91,648 bytes, SHA-256
+`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
 Start with the [keymap contract](firmware/loudest_micro/keymaps/codex_oai/README.md),
 [source hand-off](firmware/CODEX-OAI-SOURCE.md), and
 [Direct OAI build procedure](firmware/BUILD.md#agentpad13-direct-oai-experimental-alternative).

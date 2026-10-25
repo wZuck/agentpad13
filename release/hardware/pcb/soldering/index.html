@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AgentPad13 v5.8 透明版 PCB 的 10 步手焊顺序、阶段高亮图、元件数量和逐位号检查表。">
+  <title>AgentPad13 v5.8 透明版手焊工作台</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="web-data.js" defer></script>
+  <script src="web-steps.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workflow">跳到焊接步骤</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="返回页面顶部">
+      <span class="brand-code">AP13</span>
+      <span class="brand-copy">
+        <strong>手焊工作台</strong>
+        <small>透明版 · PCB v5.8</small>
+      </span>
+    </a>
+    <div class="header-actions">
+      <a class="action-button" href="agentpad13-v5_8-placement-checklist.zh-CN.csv" download title="下载位号清单">
+        <span aria-hidden="true">↓</span>
+        <span>CSV</span>
+      </a>
+      <button class="action-button" id="printButton" type="button" title="打印当前指南">
+        <span aria-hidden="true">▣</span>
+        <span>打印</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="pageTitle">
+      <div class="hero-main">
+        <div class="hero-kicker">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span>BOM / CPL VERIFIED</span>
+          <span class="hero-rule"></span>
+        <span>TRANSLUCENT BUILD</span>
+        </div>
+        <h1 id="pageTitle">透明版，<br><em>照着图焊。</em></h1>
+        <p class="hero-intro">
+          只保留透明侧发光配置：共 111 件、28 个单型号步骤。每一步只出现一种元件型号，
+          同一型号的多个位号合并在同一步，图右侧同时列出值与封装。
+        </p>
+        <div class="build-lock" aria-label="当前配置">
+          <span aria-hidden="true"></span>
+          <strong>透明版全装</strong>
+          <small>不做配置切换</small>
+        </div>
+      </div>
+
+      <div class="hero-data" aria-label="焊接统计">
+        <div class="part-total">
+          <span id="partTotal">111</span>
+          <small>个 PCB 元件</small>
+        </div>
+        <div class="hero-metrics">
+          <div>
+            <strong>28</strong>
+            <span>单型号步骤</span>
+          </div>
+          <div>
+            <strong>3</strong>
+            <span>禁止安装</span>
+          </div>
+          <div>
+            <strong id="optionalParts">20</strong>
+            <span>侧发光相关件</span>
+          </div>
+        </div>
+        <p class="variant-note" id="variantNote">
+          透明版固定安装 <code>C40-C49</code> 与 <code>LED15-LED24</code>。
+          <code>C25 / D1 / J2</code> 仍然禁止安装。
+        </p>
+      </div>
+
+      <nav class="route-rail" id="phaseRail" aria-label="按工艺分组筛选步骤"></nav>
+    </section>
+
+    <section class="workflow section-band" id="workflow" aria-labelledby="workflowTitle">
+      <div class="section-head workflow-head">
+        <div>
+          <span class="section-index">01 / SEQUENCE</span>
+          <h2 id="workflowTitle">焊接顺序</h2>
+        </div>
+        <div class="progress-panel">
+          <div class="progress-copy">
+            <span>阶段完成度</span>
+            <strong id="progressText">0 / 28</strong>
+          </div>
+          <div class="progress-track" aria-hidden="true"><i id="progressBar"></i></div>
+          <button type="button" id="resetProgress">重置</button>
+        </div>
+      </div>
+      <div class="stage-stack" id="stageStack"></div>
+    </section>
+
+    <section class="inventory section-band" aria-labelledby="inventoryTitle">
+      <div class="section-head">
+        <div>
+          <span class="section-index">02 / INVENTORY</span>
+          <h2 id="inventoryTitle">逐位号检查表</h2>
+        </div>
+        <p id="inventorySummary">透明版 111 件安装、3 件禁止安装、2 项选装。</p>
+      </div>
+
+      <div class="inventory-tools">
+        <label class="search-field">
+          <span>搜索</span>
+          <input id="inventorySearch" type="search" placeholder="位号、值、封装或说明" autocomplete="off">
+        </label>
+        <label>
+          <span>阶段</span>
+          <select id="stageFilter">
+            <option value="">全部阶段</option>
+          </select>
+        </label>
+        <label>
+          <span>面别</span>
+          <select id="sideFilter">
+            <option value="">两面</option>
+            <option value="底面 B.Cu">底面 B.Cu</option>
+            <option value="顶面 F.Cu">顶面 F.Cu</option>
+            <option value="顶面">顶面机械件</option>
+          </select>
+        </label>
+        <label>
+          <span>状态</span>
+          <select id="configFilter">
+            <option value="">全部记录</option>
+            <option value="透明版安装">透明版安装</option>
+            <option value="禁止安装">禁止安装</option>
+            <option value="选装">选装</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="table-status">
+        <span id="tableCount">116 条</span>
+        <span>点击位号可重新排序</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><button type="button" data-sort="参考位号">位号</button></th>
+              <th><button type="button" data-sort="阶段">阶段</button></th>
+              <th>值 / 型号</th>
+              <th>封装</th>
+              <th>面别</th>
+              <th><button type="button" data-sort="CPL_X_mm">X mm</button></th>
+              <th><button type="button" data-sort="CPL_Y_mm">Y mm</button></th>
+              <th>方向 / 极性</th>
+              <th>检查说明</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bringup section-band" aria-labelledby="bringupTitle">
+      <div class="section-head">
+        <div>
+          <span class="section-index">03 / POWER-ON</span>
+          <h2 id="bringupTitle">首次上电</h2>
+        </div>
+        <p>电源段必须先单独验证。不要第一次就把 USB、RP2040 和全部 LED 一起上电。</p>
+      </div>
+      <div class="bringup-grid">
+        <article class="checkpoint-card">
+          <span class="checkpoint-number">01</span>
+          <h3>装 U1 之前</h3>
+          <p>装上 <code>F1/J1/U3/U4</code>，限流从 100 mA 起步，确认 VBUS 无明显短路、
+            <code>U3</code> 输出约 3.3 V。</p>
+          <strong>3.3 V 异常就停止</strong>
+        </article>
+        <article class="checkpoint-card">
+          <span class="checkpoint-number">02</span>
+          <h3>装完 MCU</h3>
+          <p>检查 <code>U1</code> 中心焊盘、pin 1、脚间连锡，以及 3.3 V 对 GND。
+            <code>Y1</code> 和 <code>U2</code> 方向也在这里复核。</p>
+          <strong>QFN 不可堆锡</strong>
+        </article>
+        <article class="checkpoint-card">
+          <span class="checkpoint-number">03</span>
+          <h3>USB 枚举</h3>
+          <p>按住 <code>SW14</code> BOOT 再插 USB，电脑应出现 <code>RPI-RP2</code>。
+            出现后刷写 <code>firmware/prebuilt/agentpad13.uf2</code>。</p>
+          <strong>先枚举，再接负载</strong>
+        </article>
+        <article class="checkpoint-card">
+          <span class="checkpoint-number">04</span>
+          <h3>功能与校准</h3>
+          <p>逐个检查 13 个按键、编码器按压/旋转、触摸、24 颗灯，再按 BRING-UP 流程校准摇杆。</p>
+          <strong>摇杆只校准一次</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="faults section-band" aria-labelledby="faultTitle">
+      <div class="section-head">
+        <div>
+          <span class="section-index">04 / TROUBLESHOOT</span>
+          <h2 id="faultTitle">故障优先检查</h2>
+        </div>
+      </div>
+      <div class="fault-list">
+        <details>
+          <summary><span>无 3.3 V</span><small>电源入口</small></summary>
+          <p>先查 <code>F1</code>、<code>J1</code> VBUS、<code>U3</code> 方向、
+            <code>C14-C17</code> 和 U3 输出连锡。</p>
+        </details>
+        <details>
+          <summary><span>不出现 RPI-RP2</span><small>MCU / Flash</small></summary>
+          <p>检查 <code>U1</code> pin 1、中心散热焊盘、<code>Y1</code>、
+            <code>U2</code> pin 1，以及 3.3 V 是否稳定。</p>
+        </details>
+        <details>
+          <summary><span>一颗灯不亮，后面全不亮</span><small>LED 链路</small></summary>
+          <p>从第一颗不亮的 LED 查 pin 1/DIN、DOUT 和四脚虚焊。整串中断通常是这一颗造成的。</p>
+        </details>
+        <details>
+          <summary><span>触摸一直触发或完全不触发</span><small>TP5 / TTP223</small></summary>
+          <p>检查 <code>R10=0 Ω</code>、<code>U6</code> pin 1、TP5 电极和弹簧/导线接触。</p>
+        </details>
+        <details>
+          <summary><span>编码器方向相反</span><small>RE1</small></summary>
+          <p>先确认使用的是当前 v5.8 固件；编码器方向已在固件中按实板 A/B 落点处理。</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="dnp-banner" aria-label="禁止安装和机械件说明">
+      <div>
+        <span>DO NOT FIT</span>
+        <strong>C25 · D1 · J2</strong>
+      </div>
+      <p>
+        <code>TP5_CONTACT</code> 只在电极式触摸面板需要时选装。
+        <code>STAB1</code> 是定位板卫星轴，
+        PCB 上只有 NPTH 让位孔，不焊接。
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>AGENTPAD13 / TRANSLUCENT HAND SOLDER</span>
+    <a href="README.zh-CN.md">完整文字版指南</a>
+  </footer>
+
+  <dialog class="map-dialog" id="mapDialog">
+    <div class="dialog-bar">
+      <strong id="dialogTitle">PCB 标注图</strong>
+      <button type="button" id="closeMap" title="关闭" aria-label="关闭">×</button>
+    </div>
+    <div class="dialog-canvas">
+      <img id="dialogImage" src="bottom-overview.zh-CN.png" alt="">
+    </div>
+  </dialog>
+</body>
+</html>

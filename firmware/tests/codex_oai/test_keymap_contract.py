@@ -193,7 +193,7 @@ class KeymapContractTest(unittest.TestCase):
         self.assertNotIn("eeconfig_update_user", handler)
 
     def test_physical_encoder_direction_matches_target_flip(self) -> None:
-        """The flipped driver callback reports physical clockwise as true."""
+        """Compensate the v5.8 as-built encoder landing in the OAI keymap."""
         keyboard_config = (REPO / "firmware" / "loudest_micro" / "config.h").read_text()
         self.assertIn("#define ENCODER_DIRECTION_FLIP", keyboard_config)
 
@@ -207,16 +207,16 @@ class KeymapContractTest(unittest.TestCase):
         body = encoder.group(1)
 
         expected_mappings = {
-            "FN scroll": "tap_code16(clockwise ? KC_WH_D : KC_WH_U);",
-            "NAV paging": "tap_code16(clockwise ? KC_PGDN : KC_PGUP);",
-            "MEDIA volume": "tap_code16(clockwise ? KC_VOLU : KC_VOLD);",
+            "FN scroll": "tap_code16(clockwise ? KC_WH_U : KC_WH_D);",
+            "NAV paging": "tap_code16(clockwise ? KC_PGUP : KC_PGDN);",
+            "MEDIA volume": "tap_code16(clockwise ? KC_VOLD : KC_VOLU);",
             "OAI notification": (
-                "codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CW : "
-                "OAI_CONTROL_ENCODER_CCW, true)"
+                "codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CCW : "
+                "OAI_CONTROL_ENCODER_CW, true)"
             ),
             "native fallback": (
-                "native_action(clockwise ? CX_ACTION_REASONING_UP : "
-                "CX_ACTION_REASONING_DOWN);"
+                "native_action(clockwise ? CX_ACTION_REASONING_DOWN : "
+                "CX_ACTION_REASONING_UP);"
             ),
         }
         for mapping, source in expected_mappings.items():
@@ -232,7 +232,7 @@ class KeymapContractTest(unittest.TestCase):
             "codex_armed",
             "clear_codex_arm",
             "CX_ACTION_TERMINAL",
-            "native_action(clockwise ? CX_ACTION_REASONING_UP : CX_ACTION_REASONING_DOWN)",
+            "native_action(clockwise ? CX_ACTION_REASONING_DOWN : CX_ACTION_REASONING_UP)",
             "native_action(CX_ACTION_SEND)",
             "codex_oai_notify(OAI_CONTROL_ACT10, true)",
             "codex_oai_handshake_revision()",

@@ -226,8 +226,8 @@ requires Vial-QMK commit `00fc4627`, the local VIA pre-hook and Raw HID
 Report-ID patches, initialized submodules, and Arm GNU Toolchain 15.2.Rel1. It
 publishes only
 [`release/firmware/prebuilt/agentpad13_codex_oai.uf2`](../../../../release/firmware/prebuilt/agentpad13_codex_oai.uf2)
-after clean builds pass. The current candidate is 93,696 bytes with SHA-256
-`fcb50b2419419be43b7cf90b00a96b16063fcaf182bc24b9642d57e2e8adf54d`.
+after clean builds pass. The current candidate is 91,648 bytes with SHA-256
+`2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`.
 
 Run the complete host gate from the repository root with
 `python3 -m unittest discover -s firmware/tests/codex_oai -p 'test_*.py'`.

@@ -460,19 +460,19 @@ CODEX_OAI_KEEP bool encoder_update_user(uint8_t index, bool clockwise) {
     }
     switch (get_highest_layer(layer_state | default_layer_state)) {
         case L_FN:
-            tap_code16(clockwise ? KC_WH_D : KC_WH_U);
+            tap_code16(clockwise ? KC_WH_U : KC_WH_D);
             break;
         case L_USER2:
-            tap_code16(clockwise ? KC_PGDN : KC_PGUP);
+            tap_code16(clockwise ? KC_PGUP : KC_PGDN);
             break;
         case L_USER3:
-            tap_code16(clockwise ? KC_VOLU : KC_VOLD);
+            tap_code16(clockwise ? KC_VOLD : KC_VOLU);
             break;
         default:
             if (codex_oai_ready()) {
-                (void)codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CW : OAI_CONTROL_ENCODER_CCW, true);
+                (void)codex_oai_notify(clockwise ? OAI_CONTROL_ENCODER_CCW : OAI_CONTROL_ENCODER_CW, true);
             } else {
-                native_action(clockwise ? CX_ACTION_REASONING_UP : CX_ACTION_REASONING_DOWN);
+                native_action(clockwise ? CX_ACTION_REASONING_DOWN : CX_ACTION_REASONING_UP);
             }
             break;
     }

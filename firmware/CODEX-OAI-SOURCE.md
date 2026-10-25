@@ -50,8 +50,8 @@ physical flash is implied or performed by this source hand-off.
 ## Current direct-OAI artifact
 
 - file: `release/firmware/prebuilt/agentpad13_codex_oai.uf2`
-- size: `93,696` bytes
-- SHA-256: `fcb50b2419419be43b7cf90b00a96b16063fcaf182bc24b9642d57e2e8adf54d`
+- size: `91,648` bytes
+- SHA-256: `2feb795cf93b30d56edd5c5291346cab841771d1d74ad9718aba5e8f7939c8ba`
 
 The artifact is bound to the current emulator capture and manifest under
 [`evidence/`](evidence/). Physical keyboard verification remains a separate,
