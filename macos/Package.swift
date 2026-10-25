@@ -8,6 +8,7 @@ let package = Package(
     targets: [
         .target(name: "AgentPadCore"),
         .executableTarget(name: "AgentPadStudio", dependencies: ["AgentPadCore"],
+                          resources: [.copy("Resources/Models")],
                           linkerSettings: [.linkedFramework("IOKit")]),
         .testTarget(name: "AgentPadCoreTests", dependencies: ["AgentPadCore"])
     ]

@@ -4,11 +4,13 @@ import AgentPadCore
 @main
 struct AgentPadStudio: App {
     @StateObject private var model = PadModel()
+    init() {
+        if RenderValidation.runIfRequested() { exit(0) }
+    }
     var body: some Scene {
         WindowGroup("AgentPad Studio") {
             StudioView(model: model)
                 .frame(minWidth: 1010, minHeight: 730)
-                .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -22,7 +24,10 @@ struct AgentPadStudio: App {
 
 struct StudioView: View {
     @ObservedObject var model: PadModel
-    private let accent = Color(red: 0.72, green: 0.94, blue: 0.40)
+    @Environment(\.colorScheme) private var colorScheme
+    private var accent: Color {
+        colorScheme == .dark ? Color(red: 0.72, green: 0.94, blue: 0.40) : Color(red: 0.22, green: 0.42, blue: 0.10)
+    }
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -50,7 +55,7 @@ struct StudioView: View {
             Divider()
             footer
         }
-        .background(Color(red: 0.075, green: 0.085, blue: 0.09))
+        .background(Color(nsColor: .windowBackgroundColor))
         .tint(accent)
         .alert("操作未完成", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("好") { model.error = nil }
@@ -69,7 +74,7 @@ struct StudioView: View {
             } else {
                 Circle().fill(model.connected ? accent : .gray).frame(width: 7, height: 7)
                 if model.connected {
-                    Text("OAI 已连接").font(.callout)
+                    Text("HID 已连接").font(.callout)
                     Button("断开", action: model.disconnect).disabled(model.busy)
                 } else {
                     Picker("设备", selection: $model.deviceID) {
@@ -83,87 +88,20 @@ struct StudioView: View {
         }.disabled(model.busy).padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 22)
     }
     private var board: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack {
-                Text("PCB v5.8 · 正面俯视").font(.caption)
+                Label("AgentPad13", systemImage: "cube.transparent")
                 Spacer()
-                Text("USB ↑").font(.system(size: 11, design: .monospaced))
-            }.foregroundStyle(.secondary)
-            GeometryReader { geometry in
-                let scale = geometry.size.width / PhysicalLayout.width
-                ZStack(alignment: .topLeading) {
-                    PCBOutline().fill(Color(white: 0.12))
-                    PCBOutline().stroke(.white.opacity(0.15), lineWidth: 1)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(.white.opacity(0.25))
-                        .frame(width: 9 * scale, height: 3 * scale)
-                        .position(x: PhysicalLayout.usb.x * scale, y: PhysicalLayout.usb.y * scale)
-                    Text("AGENTPAD / 13")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .position(x: 42.1 * scale, y: 13 * scale)
-                    fixedControl("ENC", symbol: "circle.circle", diameter: 17.5 * scale)
-                        .position(x: PhysicalLayout.encoder.x * scale, y: PhysicalLayout.encoder.y * scale)
-                        .help("RE1 · 编码器按压固定为 ENC；旋转调整推理强度")
-                    fixedControl("JS1", symbol: "plus", diameter: 14 * scale)
-                        .position(x: PhysicalLayout.joystick.x * scale, y: PhysicalLayout.joystick.y * scale)
-                        .help("JS1 · 摇杆；默认左右切换会话")
-                    ForEach(0..<13) { index in
-                        let center = PhysicalLayout.switches[index]
-                        key(index, scale: scale)
-                            .frame(width: (index == 12 ? 36.55 : 17.5) * scale, height: 17.5 * scale)
-                            .position(x: center.x * scale, y: center.y * scale)
-                    }
-                    fixedControl("TP5", symbol: "hand.tap", diameter: 14 * scale)
-                        .position(x: PhysicalLayout.touch.x * scale, y: PhysicalLayout.touch.y * scale)
-                        .help("TP5 · 固定循环切换 CODEX / FN / NAV / MEDIA")
-                    serviceMark("BOOT", diameter: 6 * scale)
-                        .position(x: PhysicalLayout.boot.x * scale, y: PhysicalLayout.boot.y * scale)
-                        .help("背面 SW14 · BOOT / 摇杆校准，不是可映射键")
-                    serviceMark("RESET", diameter: 6 * scale)
-                        .position(x: PhysicalLayout.reset.x * scale, y: PhysicalLayout.reset.y * scale)
-                        .help("背面 SW15 · 硬件 RESET，不是可映射键")
-                }
-            }
-            .aspectRatio(PhysicalLayout.width / PhysicalLayout.height, contentMode: .fit)
-            Text("按 PCB 毫米坐标等比绘制 · 虚线标记为背面 BOOT / RESET")
-                .font(.system(size: 10)).foregroundStyle(.secondary)
-        }.frame(maxWidth: 370).frame(maxWidth: .infinity)
-    }
-    private func fixedControl(_ name: String, symbol: String, diameter: Double) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: symbol).font(.system(size: diameter * 0.23))
-            Text(name).font(.system(size: max(8, diameter * 0.13), weight: .medium, design: .monospaced))
+                Text("3D 实物视图").font(.caption).foregroundStyle(.secondary)
+            }.font(.callout.weight(.medium))
+            HardwareRenderView(map: model.map, selected: model.selected,
+                               dark: colorScheme == .dark, enabled: !model.busy) { model.selected = $0 }
+                .frame(height: 430)
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.primary.opacity(0.06)))
+            Text("点击键帽设置动作 · 基于实际外壳与键帽 CAD 模型")
+                .font(.caption).foregroundStyle(.secondary)
         }
-        .foregroundStyle(.secondary)
-        .frame(width: diameter, height: diameter)
-        .background(Circle().fill(.white.opacity(0.035)))
-        .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
-    }
-    private func serviceMark(_ name: String, diameter: Double) -> some View {
-        Text(name).font(.system(size: 6, design: .monospaced)).foregroundStyle(.secondary)
-            .frame(width: diameter, height: diameter)
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.2), style: StrokeStyle(dash: [3, 2])))
-    }
-    private func key(_ index: Int, scale: Double) -> some View {
-        let action = PadAction.all[model.map.values[index]]
-        let active = model.selected == index
-        return Button { model.selected = index } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 0) {
-                    Text("SW\(index + 1)").font(.system(size: max(8, 1.7 * scale), design: .monospaced)).foregroundStyle(active ? accent : .gray)
-                    Spacer(minLength: 0)
-                    Circle().fill(index < 6 ? accent.opacity(0.65) : .white.opacity(0.45)).frame(width: 4, height: 4)
-                }
-                Text(action.title).font(.system(size: max(10, 2.1 * scale), weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                Text(String(format: "K%02d", index) + " · " + (action.wire.components(separatedBy: " · ").first ?? ""))
-                    .font(.system(size: max(8, 1.5 * scale), design: .monospaced)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
-            }.padding(8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 9).fill(active ? accent.opacity(0.10) : .white.opacity(0.045)))
-                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(active ? accent : .white.opacity(0.09), lineWidth: active ? 1.5 : 1))
-                .contentShape(RoundedRectangle(cornerRadius: 9))
-        }.buttonStyle(.plain).disabled(model.busy)
-        .help("SW\(index + 1) · K\(String(format: "%02d", index)) · \(action.title)")
     }
     private var inspector: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -185,16 +123,17 @@ struct StudioView: View {
             Label("固定硬件行为", systemImage: "lock").font(.caption.bold())
             Text("编码器按压：ENC\nCODEX 旋转：推理强度\nTP5：CODEX → FN → NAV → MEDIA\n¹ 摇杆默认左右切换会话；FN 的 JS_MODE 可切换模式。")
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(5)
-            Text("保护规则、原生快捷键回退和 LED 均由固件执行。旧版麦克风别名实际走 ACT10，请优先选择“麦克风”（ACT11）。")
+            Text("麦克风需与 Codex 的按键布局模式一致：合并模式使用 ACT10；分离模式使用 ACT11。未握手时两者均无语音快捷键回退。")
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(4)
         }.disabled(model.busy)
     }
     private var actionHelp: String {
         switch model.map.values[model.selected] {
         case 10: return "SAFE 的解锁状态由固件计时，松开后清除。"
-        case 11, 14: return "ACT10 具有确认保护：短按不触发；保持 600 ms 后松开，或先由 SAFE 解锁。"
+        case 11: return "ACT10 具有确认保护：短按不触发；保持 600 ms 后松开，或先由 SAFE 解锁。"
         case 3: return "新建任务；原生快捷键回退模式下，长按可切换会话。"
-        case 15: return "发送官方第二麦克风触点 ACT11 的按下与松开事件。"
+        case 14: return "发送 ACT10 按下／松开。适用于 Codex 合并麦克风模式；此兼容动作绕过固件 ACCEPT 的确认保护。"
+        case 15: return "发送 ACT11 按下／松开。Codex 合并麦克风模式会忽略此事件；需要启用分离按键并分配语音动作。"
         case 0: return "禁用该键在 CODEX 层的动作。"
         default: return "OAI 就绪时发送所选控制事件；未握手时使用固件内置的原生快捷键。"
         }
@@ -213,24 +152,8 @@ struct StudioView: View {
                 Spacer()
                 Button("读取设备（替换草稿）", action: model.read).disabled(!model.connected || model.demo)
                 Button("保存到设备", action: model.save)
-                    .buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(!model.canSave)
+                    .buttonStyle(.borderedProminent).foregroundStyle(colorScheme == .dark ? .black : .white).disabled(!model.canSave)
             }.disabled(model.busy)
         }.padding(22)
-    }
-}
-
-// Use the PCB's actual asymmetric chamfers rather than a generic rounded case.
-private struct PCBOutline: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let points = PhysicalLayout.outline.map {
-            CGPoint(x: $0.x / PhysicalLayout.width * rect.width,
-                    y: $0.y / PhysicalLayout.height * rect.height)
-        }
-        guard let first = points.first else { return path }
-        path.move(to: first)
-        for point in points.dropFirst() { path.addLine(to: point) }
-        path.closeSubpath()
-        return path
     }
 }

@@ -34,8 +34,8 @@ public struct PadAction: Identifiable {
         .init(id: 11, title: "确认（保护）", wire: "ACT10 · ACCEPT"),
         .init(id: 12, title: "发送", wire: "ACT12 · SEND"),
         .init(id: 13, title: "编码器", wire: "ENC"),
-        .init(id: 14, title: "旧版麦克风别名", wire: "ACT10 · legacy MICROPHONE"),
-        .init(id: 15, title: "麦克风", wire: "ACT11")
+        .init(id: 14, title: "麦克风（合并模式）", wire: "ACT10 · MICROPHONE"),
+        .init(id: 15, title: "麦克风（分离模式）", wire: "ACT11")
     ]
     public static let editable = all.filter { $0.id != 13 }
 }
