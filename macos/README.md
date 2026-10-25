@@ -1,0 +1,73 @@
+# AgentPad Studio
+
+原生 SwiftUI macOS 应用，为当前 AgentPad13 `codex_oai` 固件配置 CODEX 层的 13 个实体按键。
+支持 macOS 13+，无第三方运行时依赖。Swift Package 包含独立的协议核心、IOKit HID 传输及界面。
+
+## 编译与运行
+
+在仓库根目录执行（需要 Xcode 或支持 Swift 5.9+ 的命令行工具）：
+
+```sh
+macos/scripts/build-app.sh
+open 'macos/dist/AgentPad Studio.app'
+```
+
+产物位于 `macos/dist/AgentPad Studio.app`。默认按当前 Mac 架构构建，使用本地 ad-hoc 签名；
+对外分发需要自己的 Developer ID 签名与公证。无需安装 Xcode 项目生成器或包管理器依赖。
+
+离线演示（不扫描或打开 USB）：
+
+```sh
+open 'macos/dist/AgentPad Studio.app' --args --demo
+```
+
+## 使用
+
+1. 插入运行 `codex_oai` 的设备，点击“扫描”，选择 USB 设备，再点击“连接并读取”。连接会用设备配置替换草稿。
+2. 点击板上 K00–K12，对应 3×4 矩阵及独立 2U 键，再选择 Codex 动作。
+3. 点击“保存到设备”。应用等待固件确认，并再次读取完整映射进行比较；只有匹配时才显示保存成功。
+4. 配置保存在固件的 wear-leveling 存储中。断线保留当前草稿，但再次连接需要重新读取。
+5. “导出”保存 JSON 文件；“导入”和“载入出厂键位”只更改草稿，保存按钮才会写入设备。
+
+若保存超时，其结果可能未知；先重新读取设备以确认实际状态，再继续编辑。写入失败后禁用继续保存，
+直到读取成功。读取设备会替换草稿，重要配置可先导出。没有连接设备时也可编辑、导入和导出。
+
+应用仅匹配 `303A:8360`、usage `FF00:61` 的 OAI Raw HID 接口，以非独占方式打开，
+不需要 Vial、Python helper、辅助功能权限或常驻服务。若系统拒绝 HID 访问，
+按 macOS 提示允许 USB 配件或输入监控权限后重新打开应用。
+产品 VID/PID 是实验身份，不用于普通 Vial 固件，也无法仅凭此身份区分其他仿真设备，连接前应核对设备。
+
+## 固件能力边界
+
+- 通过 `v.oai.keymap.get/set`，只操作 `l:0`。不发送 rgbcfg/thstatus 握手，不覆盖 Codex 的 LED/任务状态。
+- 64 字节 report 含 ID `6`、channel `2`、有效载荷长度及最多 61 字节 JSON 片段，其余补零。
+- 固件请求 ID 限于 `0...998`，应用在 `700...998` 区间滚动并验证响应 ID。共享接口不是协议级多客户端总线；
+  若 Codex 同时发送分片请求造成超时，可暂时退出后重试。应用不会将通知视为配置成功。
+- 地图为 15 个十六进制字符，出厂值 `123456789abfcd1`。实体可编辑键只有前 13 个。
+  编码器槽位 13 和 legacy 槽位 14 在读取、导入和普通键编辑时保留；载入出厂键位时恢复其出厂值。
+- 当前固件始终将编码器按压路由到 ENC；TP5 始终切层，legacy 槽位不连接实体输入，因此不提供虚假的编辑项。
+- FN/NAV/MEDIA、摇杆模式、旋转、RGB、任意键盘快捷键和宏不在当前 keymap RPC 能力范围内。
+  若需要动态配置这些行为，必须扩展固件协议和持久化结构。
+- ACT10 的 ACCEPT 和旧 MICROPHONE 别名均走保护确认路径；真正麦克风触点为 ACT11（`f`）。
+  SAFE、600 ms 确认保护、原生快捷键回退继续由固件执行。
+- 当前工作区固件版本 `0x0012` 默认摇杆左右切换会话。更早的固件可能默认鼠标模式，键位 RPC 本身兼容。
+
+协议依据：[`codex_oai.h`](../firmware/loudest_micro/keymaps/codex_oai/codex_oai.h)、
+[`codex_oai.c`](../firmware/loudest_micro/keymaps/codex_oai/codex_oai.c)、
+[`keymap.c`](../firmware/loudest_micro/keymaps/codex_oai/keymap.c)。本实现无需提取第三方 DMG 的代码或资源。
+
+## 验证
+
+```sh
+swift test --package-path macos
+python3 -m unittest discover -s firmware/tests/codex_oai -p 'test_*.py'
+```
+
+Swift 测试覆盖映射合法性、保留槽位、JSON 配置兼容性、HID 分片及响应重组，
+并编译仓库真实的 C 协议引擎，将 Swift 生成的 GET/SET/GET 帧送入引擎，验证出厂读取、写入及回读。
+这验证了字节协议，不等同于实机 IOKit/USB、断线重连或断电持久化验证。
+
+实机验收：读取 → 修改一个键 → 保存回读一致 → 按键验证 → 拔插后重读 → 验证 Codex Desktop 同时运行。
+本次开发不自动写入或刷写任何连接设备。固件实机操作另参见仓库 physical runbook。
+
+License: GPL-2.0-or-later.

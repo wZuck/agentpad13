@@ -79,6 +79,21 @@ still entirely PENDING; no install or flash occurred. Any future hardware
 operation requires the literal authorization and observation record in the
 [physical runbook](docs/codex-oai-physical-runbook.md).
 
+## macOS key configuration
+
+[AgentPad Studio](macos/README.md) is a native macOS app for the experimental
+`codex_oai` firmware. Edit the 13 physical keys, read/write the device map,
+and import/export JSON profiles. Saves are acknowledged and verified by readback.
+Encoder press, TP5 layer cycling and auxiliary layers follow the firmware's fixed behavior.
+
+```sh
+macos/scripts/build-app.sh
+open 'macos/dist/AgentPad Studio.app'
+```
+
+Requires macOS 13+ and Swift 5.9+ to build. See the app guide for offline demo,
+protocol limits and validation. This does not change the recommended Vial firmware.
+
 ## First power-on
 
 Flash [`agentpad13.uf2`](release/firmware/prebuilt/agentpad13.uf2) — hold BOOTSEL and drag the file on. Then hold
