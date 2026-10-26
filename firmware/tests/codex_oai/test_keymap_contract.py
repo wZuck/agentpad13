@@ -41,7 +41,7 @@ class KeymapContractTest(unittest.TestCase):
         for name, definition in (
             ("VENDOR_ID", "#define VENDOR_ID 0x303A"),
             ("PRODUCT_ID", "#define PRODUCT_ID 0x8360"),
-            ("DEVICE_VER", "#define DEVICE_VER 0x000E"),
+            ("DEVICE_VER", "#define DEVICE_VER 0x0013"),
             ("MANUFACTURER", "#define MANUFACTURER \"hirlu\""),
             ("PRODUCT", "#define PRODUCT \"Codex Micro Lab OAI LED\""),
             ("RAW_USAGE_PAGE", "#define RAW_USAGE_PAGE 0xFF00"),

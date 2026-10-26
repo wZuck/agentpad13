@@ -4,7 +4,7 @@ import XCTest
 final class AgentPadCoreTests: XCTestCase {
     func testMapValidationAndProfiles() throws {
         let factory = try Keymap()
-        XCTAssertEqual(factory.hex, "123456789abfcd1")
+        XCTAssertEqual(factory.hex, "123456789abecd1")
         XCTAssertEqual(try Keymap(profileData: factory.profileData()), factory)
         for invalid in ["", "123", "123456789abfcdz", "d23456789abfcd1", "123456789abfcdd"] {
             XCTAssertThrowsError(try Keymap(hex: invalid))

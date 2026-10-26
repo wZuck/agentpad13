@@ -66,10 +66,14 @@ Vial. El mapa se representa como 15 dígitos hexadecimales, uno por posición:
 | `e` | MICROPHONE (`ACT10` push-to-talk) |
 | `f` | ACT11 (second official microphone contact) |
 
-El mapa de fábrica es `123456789abfcd1`: las posiciones 0–12 siguen el orden
-oficial `AG00..AG05`, `ACT06..ACT12`; la posición 13 es el click del encoder y
-14 se conserva como ranura OAI legacy para compatibilidad del protocolo. TP5
-ya no emite esa ranura: cambia de capa. Las capas FN/NAV/MEDIA
+El mapa de fábrica es `123456789abecd1`: las posiciones 0–10 y 12 siguen el
+orden oficial `AG00..AG05`, `ACT06..ACT12`; la posición 11 usa `e`
+(`MICROPHONE`/`ACT10`) para funcionar con la configuración combinada
+predeterminada de Codex. Para el modo separado, cambia esa posición a `f`
+(`ACT11`) y habilita las teclas de micrófono separadas en Codex. La posición
+13 es el click del encoder y 14 se conserva como ranura OAI legacy para
+compatibilidad del protocolo. TP5 ya no emite esa ranura: cambia de capa.
+Las capas FN/NAV/MEDIA
 siguen siendo keymap QMK normal y se pueden modificar en `keymap.c`; la API
 solo cambia CODEX/OAI.
 
@@ -82,7 +86,7 @@ Leer el mapa:
 Respuesta compacta:
 
 ```json
-{"result":{"l":0,"m":"123456789abfcd1"},"id":42}
+{"result":{"l":0,"m":"123456789abecd1"},"id":42}
 ```
 
 Guardar un mapa personalizado:
@@ -98,10 +102,12 @@ posición reservada de `ENC` antes de sustituir nada. Una respuesta
 La copia se guarda con magic, versión y checksum en el wear-leveling del
 RP2040 (fuera del área `eeconfig`); tras reiniciar se recupera automáticamente.
 El formato persistido está en la versión 3. Las copias de fábrica anteriores
-(`...abccd1` y `...abced1`) se migran al nuevo mapa `...abfcd1`, mientras que
-un mapa personalizado se conserva. Si la copia está ausente o corrupta se
-reinstala el mapa de fábrica. Un reset de EEPROM (`eeconfig_init_user`) también
-vuelve a los defaults.
+(`...abccd1`, `...abced1` y `...abfcd1`) se migran al nuevo mapa
+`...abecd1`, mientras que un mapa personalizado se conserva. La migración
+reconoce únicamente la copia completa antigua; no reemplaza una tecla `f`
+que forme parte de un mapa personalizado. Si la copia está ausente o corrupta
+se reinstala el mapa de fábrica. Un reset de EEPROM (`eeconfig_init_user`)
+también vuelve a los defaults.
 
 ## Layer behavior and native fallback
 
@@ -141,7 +147,9 @@ EEPROM store used by every joystick mode.
 Before the OAI handshake is ready, CODEX controls fall back to the proven
 native Codex shortcuts: AG00/AG01 previous/next, AG02 new task, AG03 review,
 AG04 plan, AG05 implement, ACT06 refactor, ACT07 test, ACT08 abort, ACT09 SAFE,
-ACT10 protected ACCEPT, ACT11 microphone, and ACT12 SEND. ACCEPT is a no-op on a short tap
+ACT10 protected ACCEPT, ACT11 microphone, and ACT12 SEND. The factory
+microphone action is `MICROPHONE`/ACT10 because Codex's default layout ignores
+ACT11. ACCEPT is a no-op on a short tap
 and fires once on release after 600 ms or after SAFE has been held long enough
 to arm. NEW emits the primary-modifier+N shortcut on a short tap and
 Control+grave when held for `TAPPING_TERM` or longer. Releasing SAFE always
@@ -171,7 +179,7 @@ route. The normal `AG00` action remains on K00.
 | `[2,0]` | grid key | `ACT08` |
 | `[2,1]` | grid key | `ACT09` |
 | `[2,2]` | matrix key 11 | `ACT10` / protected `ACCEPT` |
-| `[2,3]` | matrix key 12 | `ACT11` / microphone |
+| `[2,3]` | matrix key 12 | factory `MICROPHONE`/`ACT10`; `f` selects `ACT11` |
 | `[3,0]` | separate 2U key | `ACT12` / SEND |
 | `[3,1]` | encoder press | `ENC` |
 | `[3,2]` | capacitive touch TP5 | cycle layer |

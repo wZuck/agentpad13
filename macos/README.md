@@ -62,17 +62,18 @@ python3 macos/scripts/generate-layout.py --check
 - 64 字节 report 含 ID `6`、channel `2`、有效载荷长度及最多 61 字节 JSON 片段，其余补零。
 - 固件请求 ID 限于 `0...998`，应用在 `700...998` 区间滚动并验证响应 ID。共享接口不是协议级多客户端总线；
   若 Codex 同时发送分片请求造成超时，可暂时退出后重试。应用不会将通知视为配置成功。
-- 地图为 15 个十六进制字符，出厂值 `123456789abfcd1`。实体可编辑键只有前 13 个。
+- 地图为 15 个十六进制字符，出厂值 `123456789abecd1`。实体可编辑键只有前 13 个。
   编码器槽位 13 和 legacy 槽位 14 在读取、导入和普通键编辑时保留；载入出厂键位时恢复其出厂值。
 - 当前固件始终将编码器按压路由到 ENC；TP5 始终切层，legacy 槽位不连接实体输入，因此不提供虚假的编辑项。
 - FN/NAV/MEDIA、摇杆模式、旋转、RGB、任意键盘快捷键和宏不在当前 keymap RPC 能力范围内。
   若需要动态配置这些行为，必须扩展固件协议和持久化结构。
 - 麦克风有两种兼容动作：`e`“合并模式”发 ACT10，`f`“分离模式”发 ACT11。当前 Codex 客户端在
-  `separateMicrophoneKeys=false` 时直接忽略 ACT11，因此需选择合并模式，或在 Codex 中启用分离按键并分配语音动作。
+  `separateMicrophoneKeys=false` 时直接忽略 ACT11；固件因此默认使用合并模式。若要把麦克风键改为分离模式，
+  需在 Codex 中启用分离按键并分配语音动作。
   `e` 是固件保留的 MICROPHONE 兼容值，会绕过 ACCEPT 保护；`b` 才是受保护的 ACCEPT 动作。
   两种麦克风动作都没有未握手时的原生语音快捷键回退。语音功能还取决于 Codex 的配置与权限。
   应用只读写映射，显示“HID 已连接”不代表语音已就绪。
-- 当前工作区固件版本 `0x0012` 默认摇杆左右切换会话。更早的固件可能默认鼠标模式，键位 RPC 本身兼容。
+- 当前工作区固件版本 `0x0013` 默认麦克风使用合并模式；更早固件仍可配置键位。
 
 协议依据：[`codex_oai.h`](../firmware/loudest_micro/keymaps/codex_oai/codex_oai.h)、
 [`codex_oai.c`](../firmware/loudest_micro/keymaps/codex_oai/codex_oai.c)、

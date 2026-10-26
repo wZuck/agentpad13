@@ -47,6 +47,13 @@ static void seed_current_legacy_keymap(void) {
     write_keymap(OAI_KEYMAP_STORE_VERSION, legacy_map);
 }
 
+static void seed_act11_factory_keymap(void) {
+    static const uint8_t act11_map[OAI_KEYMAP_POSITION_COUNT] = {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 12, 13, 1,
+    };
+    write_keymap(OAI_KEYMAP_STORE_VERSION, act11_map);
+}
+
 static void seed_legacy_custom_keymap(void) {
     static const uint8_t custom_map[OAI_KEYMAP_POSITION_COUNT] = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0,
@@ -171,6 +178,8 @@ int main(void) {
             seed_legacy_keymap();
         } else if (strcmp(line, "CURRENT_LEGACY\n") == 0) {
             seed_current_legacy_keymap();
+        } else if (strcmp(line, "ACT11_LEGACY\n") == 0) {
+            seed_act11_factory_keymap();
         } else if (strcmp(line, "LEGACY_CUSTOM\n") == 0) {
             seed_legacy_custom_keymap();
         } else if (strncmp(line, "FRAME ", 6) == 0) {

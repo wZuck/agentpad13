@@ -52,10 +52,10 @@ SHA-256
 | rgbcfg + thstatus + device.status | PENDING | The three OAI RPC acknowledgements arrive once and readiness changes; an empty `thstatus` array is a valid no-op handshake. |
 | power-on LED sweep 1→24 | PENDING | White dot visits every LED in chain order, then two green completion flashes. |
 | CODEX boot layer | PENDING | After the 2.28-second sweep, LED 13 is red and the active layer is CODEX/OAI even if FN/NAV/MEDIA was active before USB was disconnected. TP5 is deliberately ignored during that sweep, then resumes its normal cycle. |
-| keymap.get default | PENDING | `123456789abfcd1` is returned for layer 0; positions 0–12 follow `AG00..AG05`, `ACT06..ACT12`, with the encoder at position 13. |
+| keymap.get default | PENDING | `123456789abecd1` is returned for layer 0; position 11 uses the combined-microphone `e` compatibility action, and the encoder is at position 13. |
 | keymap.set + persistence | PENDING | A valid 15-digit map ACKs, survives reconnect, and invalid maps are rejected atomically. |
 | AG00..AG05 | PENDING | Each grid agent key produces its matching press notification; release remains intentionally silent. |
-| ACT06..ACT12 | PENDING | Matrix/function positions produce their matching press/release notifications; ACT10 is protected ACCEPT, ACT11 is the second microphone contact, and ACT12 is SEND. |
+| ACT06..ACT12 | PENDING | Matrix/function positions produce their matching press/release notifications; ACT10 is protected ACCEPT, the factory microphone action also emits ACT10, ACT11 is available by selecting `f`, and ACT12 is SEND. |
 | ENC / ENC_CW / ENC_CC | PENDING | Encoder press and both directions produce the allowlisted notifications. |
 | TP5 layer cycle + indicator | PENDING | A tap cycles `CODEX -> FN -> NAV -> MEDIA -> CODEX` without an OAI control; LED 13 changes red/yellow/green/cyan after the OAI link is ready. |
 | native NEW short/hold fallback | PENDING | Before OAI readiness, short release produces primary-modifier+N; hold ≥ `TAPPING_TERM` produces Control+grave once. |
@@ -80,7 +80,8 @@ SHA-256
 4. Test AG keys, matrix ACT keys, the separate 2U ACT12/SEND key, encoder
    press/rotation and touch; record press and release notifications separately
    where applicable. Confirm matrix key 11 keeps its protected ACCEPT timing,
-   matrix key 12 emits ACT11, and the 2U emits ACT12/SEND.
+   matrix key 12 emits the factory combined-microphone ACT10 event, and the 2U
+   emits ACT12/SEND. Select `f` explicitly to verify the separate ACT11 path.
 5. Exercise task data for slots 0–5 and inspect their LEDs, action feedback,
    link state and underglow.
 6. Test the error path using malformed or incomplete protocol input only in a

@@ -87,6 +87,27 @@ static const uint8_t default_oai_keymap[OAI_KEYMAP_POSITION_COUNT] = {
     OAI_KEYMAP_ABORT,
     OAI_KEYMAP_SAFE,
     OAI_KEYMAP_ACCEPT,
+    OAI_KEYMAP_MICROPHONE,
+    OAI_KEYMAP_SEND,
+    OAI_KEYMAP_ENCODER,
+    OAI_KEYMAP_PREVIOUS,
+};
+
+/* Device version 0x0012 stored ACT11 at the microphone position. Codex's
+ * default combined-microphone layout ignores ACT11, so recognize that exact
+ * factory map once and migrate it without touching customized maps. */
+static const uint8_t act11_default_oai_keymap[OAI_KEYMAP_POSITION_COUNT] = {
+    OAI_KEYMAP_PREVIOUS,
+    OAI_KEYMAP_NEXT,
+    OAI_KEYMAP_NEW,
+    OAI_KEYMAP_REVIEW,
+    OAI_KEYMAP_PLAN,
+    OAI_KEYMAP_IMPLEMENT,
+    OAI_KEYMAP_REFACTOR,
+    OAI_KEYMAP_TEST,
+    OAI_KEYMAP_ABORT,
+    OAI_KEYMAP_SAFE,
+    OAI_KEYMAP_ACCEPT,
     OAI_KEYMAP_ACT11,
     OAI_KEYMAP_SEND,
     OAI_KEYMAP_ENCODER,
@@ -202,7 +223,8 @@ static void keymap_load(void) {
         && keymap_values_valid(store.map)
     ) {
         bool factory_map =
-            memcmp(store.map, legacy_default_oai_keymap, sizeof(store.map)) == 0
+            memcmp(store.map, act11_default_oai_keymap, sizeof(store.map)) == 0
+            || memcmp(store.map, legacy_default_oai_keymap, sizeof(store.map)) == 0
             || memcmp(store.map, previous_default_oai_keymap, sizeof(store.map)) == 0;
         if (store.version == OAI_KEYMAP_STORE_VERSION) {
             if (factory_map) {

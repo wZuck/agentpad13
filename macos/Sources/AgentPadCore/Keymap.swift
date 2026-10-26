@@ -41,7 +41,7 @@ public struct PadAction: Identifiable {
 }
 
 public struct Keymap: Equatable, Sendable {
-    public static let factoryHex = "123456789abfcd1"
+    public static let factoryHex = "123456789abecd1"
     public private(set) var values: [Int]
     public init(hex: String = Keymap.factoryHex) throws {
         let parsed = hex.compactMap { Int(String($0), radix: 16) }

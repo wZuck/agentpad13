@@ -512,3 +512,19 @@ and the older historical manifest (92,672 bytes,
 remain provenance only and are superseded by the port rebuild. The complete
 physical matrix remains **PENDING**; no automatic installation or flash was
 performed.
+
+## Addendum — 2026-10-26: combined-microphone factory default
+
+The `0x0012` factory map used `f`/ACT11 at the microphone position. Codex's
+default combined-microphone configuration ignores ACT11, so that event did
+not activate voice input. The new factory map is `123456789abecd1`: position
+11 uses `e`/`MICROPHONE`, which emits ACT10 and works with the default Codex
+layout. Position 11 can still be set to `f` when Codex's separate microphone
+keys are enabled.
+
+On the next boot, firmware recognizes the exact previous factory record
+`123456789abfcd1` and migrates it to the combined default. Custom maps,
+including maps that intentionally contain `f`, are preserved. The application
+also uses `123456789abecd1` for its factory reset and documents both choices.
+The migration and wire behavior are covered by the host protocol harness;
+physical voice activation and the rebuilt UF2 remain **PENDING** validation.

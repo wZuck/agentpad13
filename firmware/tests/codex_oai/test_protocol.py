@@ -174,6 +174,9 @@ class Harness:
     def seed_current_legacy_keymap(self) -> HarnessResult:
         return self._command("CURRENT_LEGACY")
 
+    def seed_act11_factory_keymap(self) -> HarnessResult:
+        return self._command("ACT11_LEGACY")
+
     def seed_legacy_custom_keymap(self) -> HarnessResult:
         return self._command("LEGACY_CUSTOM")
 
@@ -331,7 +334,7 @@ class ProtocolParityTest(unittest.TestCase):
         result = self.harness.keymap_get()
         self.assertEqual(
             result.sent,
-            (make_report(b'{"result":{"l":0,"m":"123456789abfcd1"},"id":42}\r\n'),),
+            (make_report(b'{"result":{"l":0,"m":"123456789abecd1"},"id":42}\r\n'),),
         )
         self.assertLessEqual(result.sent[0][2], 61)
 
@@ -425,7 +428,7 @@ class ProtocolParityTest(unittest.TestCase):
         self.harness.reset()
         self.assertEqual(
             self.harness.keymap_get().sent,
-            (make_report(b'{"result":{"l":0,"m":"123456789abfcd1"},"id":42}\r\n'),),
+            (make_report(b'{"result":{"l":0,"m":"123456789abecd1"},"id":42}\r\n'),),
         )
 
     def test_legacy_factory_map_migrates_to_official_act10_act11_act12_order(self) -> None:
@@ -433,7 +436,7 @@ class ProtocolParityTest(unittest.TestCase):
         self.harness.reset()
         self.assertEqual(
             self.harness.keymap_get().sent,
-            (make_report(b'{"result":{"l":0,"m":"123456789abfcd1"},"id":42}\r\n'),),
+            (make_report(b'{"result":{"l":0,"m":"123456789abecd1"},"id":42}\r\n'),),
         )
 
     def test_current_old_factory_map_migrates_to_official_act10_act11_act12_order(self) -> None:
@@ -441,7 +444,26 @@ class ProtocolParityTest(unittest.TestCase):
         self.harness.reset()
         self.assertEqual(
             self.harness.keymap_get().sent,
-            (make_report(b'{"result":{"l":0,"m":"123456789abfcd1"},"id":42}\r\n'),),
+            (make_report(b'{"result":{"l":0,"m":"123456789abecd1"},"id":42}\r\n'),),
+        )
+
+    def test_act11_factory_map_migrates_to_combined_microphone(self) -> None:
+        self.harness.seed_act11_factory_keymap()
+        self.harness.reset()
+        self.assertEqual(
+            self.harness.keymap_get().sent,
+            (make_report(b'{"result":{"l":0,"m":"123456789abecd1"},"id":42}\r\n'),),
+        )
+
+    def test_custom_act11_map_is_not_treated_as_factory(self) -> None:
+        mapping = "0123456789afcd0"
+        self.harness.keymap_set(mapping)
+        self.harness.reset()
+        self.assertEqual(
+            self.harness.keymap_get().sent,
+            (make_report(
+                b'{"result":{"l":0,"m":"0123456789afcd0"},"id":42}\r\n'
+            ),),
         )
 
     def test_legacy_custom_map_survives_store_version_migration(self) -> None:

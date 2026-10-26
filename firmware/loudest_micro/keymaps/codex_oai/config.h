@@ -15,7 +15,7 @@
 
 #define VENDOR_ID 0x303A
 #define PRODUCT_ID 0x8360
-#define DEVICE_VER 0x000E
+#define DEVICE_VER 0x0013
 #define MANUFACTURER "hirlu"
 #define PRODUCT "Codex Micro Lab OAI LED"
 
