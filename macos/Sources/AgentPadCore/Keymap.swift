@@ -76,11 +76,48 @@ public struct Keymap: Equatable, Sendable {
     }
 }
 
+public struct LEDSettings: Equatable, Sendable {
+    public static let factory = LEDSettings(isOn: true, brightness: 100)
+
+    public var isOn: Bool
+    private var level: Int
+    public var brightness: Int {
+        get { level }
+        set { level = min(max(newValue, 0), 100) }
+    }
+
+    public init(isOn: Bool, brightness: Int) {
+        self.isOn = isOn
+        level = min(max(brightness, 0), 100)
+    }
+
+    public init(result: [String: Any]) throws {
+        guard let isOn = result["on"] as? Bool,
+              let brightness = (result["brightness"] as? NSNumber)?.intValue,
+              (0...100).contains(brightness) else {
+            throw PadError.invalidReport
+        }
+        self.init(isOn: isOn, brightness: brightness)
+    }
+}
+
 public enum OAIWire {
-    public static func request(method: String, id: UInt16, map: Keymap? = nil) throws -> [[UInt8]] {
+    public static func request(
+        method: String,
+        id: UInt16,
+        map: Keymap? = nil,
+        led: LEDSettings? = nil
+    ) throws -> [[UInt8]] {
         guard id <= 998 else { throw PadError.invalidReport }
-        var params: [String: Any] = ["l": 0]
+        var params: [String: Any] = [:]
+        if map != nil || method.hasPrefix("v.oai.keymap.") {
+            params["l"] = 0
+        }
         if let map { params["m"] = map.hex }
+        if let led {
+            params["on"] = led.isOn
+            params["brightness"] = led.brightness
+        }
         let data = try JSONSerialization.data(withJSONObject: ["method": method, "id": Int(id), "params": params], options: [.sortedKeys])
         return frames(Array(data) + [13, 10])
     }

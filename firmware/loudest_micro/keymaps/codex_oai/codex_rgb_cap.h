@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /* Apply QMK's live value and board maximum only at the physical LED boundary.
@@ -12,5 +13,20 @@ static inline uint8_t codex_rgb_cap_channel(
     uint8_t maximum_brightness
 ) {
     uint8_t scale = current_value < maximum_brightness ? current_value : maximum_brightness;
+    return (uint8_t)(((uint16_t)channel * scale) / 255U);
+}
+
+static inline uint8_t codex_rgb_apply_led(
+    uint8_t channel,
+    uint8_t current_value,
+    uint8_t maximum_brightness,
+    uint8_t led_brightness,
+    bool enabled
+) {
+    if (!enabled || led_brightness == 0U) {
+        return 0U;
+    }
+    uint8_t scale = current_value < maximum_brightness ? current_value : maximum_brightness;
+    scale = (uint8_t)(((uint16_t)scale * led_brightness) / 100U);
     return (uint8_t)(((uint16_t)channel * scale) / 255U);
 }

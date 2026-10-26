@@ -16,11 +16,13 @@ bool via_command_kb(uint8_t *data, uint8_t length);
 // QK_KB_0.. is the keyboard custom range; these also appear in vial.json
 // customKeycodes as USER00/USER01 so the Vial GUI can bind them.
 enum loudest_keycodes {
-    JS_MODE = QK_KB_0, // cycle joystick mode; Codex builds add mouse pointer
+    JS_MODE = QK_KB_0, // cycle joystick mode
     TP_TOG,            // enable/disable the GP16 touch key
 };
 
 bool loudest_joystick_is_deflected(void);
+bool loudest_joystick_was_recently_deflected(uint32_t window_ms);
+void loudest_joystick_session_step(int8_t direction);
 
 // ---------------------------------------------------------------------------
 // Raw-HID status protocol v1 - LOCKED. Wire counterpart and single source of

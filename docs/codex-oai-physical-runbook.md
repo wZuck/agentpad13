@@ -26,9 +26,9 @@ recovery. No physical check is PASS until a person has observed it on the
 board.
 
 Current build candidate:
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `93184` bytes,
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `94208` bytes,
 SHA-256
-`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
+`247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`.
 
 ## Pre-flight, manual only
 
@@ -54,6 +54,7 @@ SHA-256
 | CODEX boot layer | PENDING | After the 2.28-second sweep, LED 13 is red and the active layer is CODEX/OAI even if FN/NAV/MEDIA was active before USB was disconnected. TP5 is deliberately ignored during that sweep, then resumes its normal cycle. |
 | keymap.get default | PENDING | `123456789abecd1` is returned for layer 0; position 11 uses the combined-microphone `e` compatibility action, and the encoder is at position 13. |
 | keymap.set + persistence | PENDING | A valid 15-digit map ACKs, survives reconnect, and invalid maps are rejected atomically. |
+| led settings + persistence | PENDING | The app can change LED power and brightness, read the values back, and recover the same values after a power cycle; invalid values are rejected atomically. |
 | AG00..AG05 | PENDING | Each grid agent key produces its matching press notification; release remains intentionally silent. |
 | ACT06..ACT12 | PENDING | Matrix/function positions produce their matching press/release notifications; ACT10 is protected ACCEPT, the factory microphone action also emits ACT10, ACT11 is available by selecting `f`, and ACT12 is SEND. |
 | ENC / ENC_CW / ENC_CC | PENDING | Encoder press and both directions produce the allowlisted notifications. |

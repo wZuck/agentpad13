@@ -61,8 +61,8 @@ locked `Codex Micro Lab OAI LED` identity (`303A:8360`, usage `FF00:61`, Report
 ID 6, 64-byte reports).
 
 The current artifact is
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 93,184 bytes, SHA-256
-`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 94,208 bytes, SHA-256
+`247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`.
 Start with the [keymap contract](firmware/loudest_micro/keymaps/codex_oai/README.md),
 [source hand-off](firmware/CODEX-OAI-SOURCE.md), and
 [Direct OAI build procedure](firmware/BUILD.md#agentpad13-direct-oai-experimental-alternative).
@@ -83,7 +83,8 @@ operation requires the literal authorization and observation record in the
 
 [AgentPad Studio](macos/README.md) is a native macOS app for the experimental
 `codex_oai` firmware. Edit the 13 physical keys, read/write the device map,
-and import/export JSON profiles. Saves are acknowledged and verified by readback.
+control LED power and brightness, and import/export JSON profiles. Saves are
+acknowledged and verified by readback.
 Encoder press, TP5 layer cycling and auxiliary layers follow the firmware's fixed behavior.
 
 ```sh

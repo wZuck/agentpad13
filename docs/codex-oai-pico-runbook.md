@@ -65,8 +65,8 @@ Antes de escribir la Pico, verifica siempre el manifiesto local:
 
 - Target: `loudest_micro:codex_oai`
 - Archivo: `release/firmware/prebuilt/agentpad13_codex_oai.uf2`
-- UF2: 93.184 bytes
-- SHA-256: `46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`
+- UF2: 94.208 bytes
+- SHA-256: `247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`
 - USB: `303A:8360`, Raw HID `FF00:0061`, Report ID 6, 64 bytes
 
 Con el handshake todavía no iniciado, CODEX usa el fallback nativo. TP5 recorre

@@ -37,6 +37,23 @@ final class AgentPadCoreTests: XCTestCase {
         XCTAssertThrowsError(try decoder.receive(malformed))
     }
 
+    func testLEDSettingsAndRequestParameters() throws {
+        let settings = try LEDSettings(result: ["on": false, "brightness": 37])
+        XCTAssertFalse(settings.isOn)
+        XCTAssertEqual(settings.brightness, 37)
+        XCTAssertEqual(LEDSettings(isOn: true, brightness: -10).brightness, 0)
+        XCTAssertEqual(LEDSettings(isOn: true, brightness: 140).brightness, 100)
+        XCTAssertThrowsError(try LEDSettings(result: ["on": true, "brightness": 101]))
+
+        let frames = try OAIWire.request(method: "v.agentpad.led.set", id: 704, led: settings)
+        let payload = try frames.flatMap { try OAIWire.payload($0) }
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(payload)) as? [String: Any])
+        let params = try XCTUnwrap(json["params"] as? [String: Any])
+        XCTAssertEqual(params["on"] as? Bool, false)
+        XCTAssertEqual(params["brightness"] as? Int, 37)
+        XCTAssertNil(params["l"])
+    }
+
     func testSwiftRequestsAgainstActualFirmwareEngine() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -56,6 +73,8 @@ final class AgentPadCoreTests: XCTestCase {
         let requests = try OAIWire.request(method: "v.oai.keymap.get", id: 701)
             + OAIWire.request(method: "v.oai.keymap.set", id: 702, map: candidate)
             + OAIWire.request(method: "v.oai.keymap.get", id: 703)
+            + OAIWire.request(method: "v.agentpad.led.set", id: 704, led: LEDSettings(isOn: false, brightness: 37))
+            + OAIWire.request(method: "v.agentpad.led.get", id: 705)
         var commands = ""
         for (index, frame) in requests.enumerated() {
             if index == requests.count - 1 { commands += "RESET\n" }
@@ -78,11 +97,16 @@ final class AgentPadCoreTests: XCTestCase {
             let bytes = stride(from: 0, to: hex.count, by: 2).compactMap { UInt8(String(hex[$0..<$0+2]), radix: 16) }
             responses += try decoder.receive(bytes)
         }
-        XCTAssertEqual(responses.count, 3)
-        guard responses.count == 3 else { return }
+        XCTAssertEqual(responses.count, 5)
+        guard responses.count == 5 else { return }
         XCTAssertEqual((responses.first?["result"] as? [String: Any])?["m"] as? String, Keymap.factoryHex)
         XCTAssertEqual(responses[1]["result"] as? Bool, true)
-        XCTAssertEqual((responses.last?["result"] as? [String: Any])?["m"] as? String, candidate.hex)
-        XCTAssertEqual(responses.last?["id"] as? Int, 703)
+        XCTAssertEqual((responses[2]["result"] as? [String: Any])?["m"] as? String, candidate.hex)
+        XCTAssertEqual(responses[2]["id"] as? Int, 703)
+        XCTAssertEqual(responses[3]["result"] as? Bool, true)
+        let ledResult = try XCTUnwrap(responses[4]["result"] as? [String: Any])
+        XCTAssertEqual(ledResult["on"] as? Bool, false)
+        XCTAssertEqual((ledResult["brightness"] as? NSNumber)?.intValue, 37)
+        XCTAssertEqual(responses[4]["id"] as? Int, 705)
     }
 }

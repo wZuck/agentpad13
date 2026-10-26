@@ -14,14 +14,20 @@ final class PadModel: ObservableObject {
     @Published var status = "连接设备以读取当前键位，或先离线编辑。"
     @Published var error: String?
     @Published var baseline: Keymap?
+    @Published var led = LEDSettings.factory
+    @Published var ledBaseline: LEDSettings?
+    @Published var ledSupported = true
     private let transport = HIDTransport()
     var dirty: Bool { map != baseline }
+    var ledDirty: Bool { led != ledBaseline }
     var canSave: Bool { connected && !demo && !busy && baseline != nil && dirty }
+    var canSaveLED: Bool { connected && !demo && !busy && ledSupported && ledBaseline != nil && ledDirty }
 
     init() {
         transport.onDisconnect = { [weak self] in
             self?.connected = false
             self?.baseline = nil
+            self?.ledBaseline = nil
             self?.status = "USB 连接已断开；草稿已保留。"
         }
         if demo { status = "演示模式 · 所有修改仅在本地，不访问 USB。" }
@@ -40,20 +46,31 @@ final class PadModel: ObservableObject {
             try self.transport.connect(target)
             self.connected = true
             self.baseline = nil
+            self.ledBaseline = nil
+            self.ledSupported = true
             try await self.readMap()
-            self.status = "已读取设备配置。"
+            if await self.readLEDIfSupported() {
+                self.status = "已读取键位与灯光配置。"
+            } else {
+                self.status = "已读取键位；此设备固件不支持灯光配置。"
+            }
         }
     }
     func disconnect() {
         transport.disconnect()
         connected = false
         baseline = nil
+        ledBaseline = nil
         status = "已断开；草稿已保留。"
     }
     func read() {
         run {
             try await self.readMap()
-            self.status = "已重新读取设备配置。"
+            if await self.readLEDIfSupported() {
+                self.status = "已重新读取键位与灯光配置。"
+            } else {
+                self.status = "已重新读取键位；此设备固件不支持灯光配置。"
+            }
         }
     }
     private func readMap() async throws {
@@ -64,6 +81,25 @@ final class PadModel: ObservableObject {
         let received = try Keymap(hex: hex)
         map = received
         baseline = received
+    }
+    private func readLED() async throws {
+        let response = try await transport.request("v.agentpad.led.get")
+        guard let result = response["result"] as? [String: Any] else { throw PadError.invalidReport }
+        let received = try LEDSettings(result: result)
+        led = received
+        ledBaseline = received
+        ledSupported = true
+    }
+    @discardableResult
+    private func readLEDIfSupported() async -> Bool {
+        do {
+            try await readLED()
+            return true
+        } catch {
+            ledSupported = false
+            ledBaseline = nil
+            return false
+        }
     }
     func save() {
         guard canSave else { return }
@@ -79,6 +115,17 @@ final class PadModel: ObservableObject {
         }
     }
     func restore() { map = try! Keymap(); status = "已载入出厂键位草稿；点击保存后才会写入设备。" }
+    func saveLED() {
+        guard canSaveLED else { return }
+        let candidate = led
+        run {
+            let response = try await self.transport.request("v.agentpad.led.set", led: candidate)
+            guard let result = response["result"] as? Bool, result else { throw PadError.invalidReport }
+            try await self.readLED()
+            guard self.led == candidate else { throw PadError.device("回读灯光设置与写入值不一致，请重新读取后检查。") }
+            self.status = "灯光设置已保存到设备并回读验证。"
+        }
+    }
     func assign(_ value: Int) { map.assign(value, to: selected) }
     func importProfile() {
         let panel = NSOpenPanel()

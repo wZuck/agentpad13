@@ -83,12 +83,12 @@ final class HIDTransport: NSObject {
         decoder.reset()
     }
 
-    func request(_ method: String, map: Keymap? = nil) async throws -> [String: Any] {
+    func request(_ method: String, map: Keymap? = nil, led: LEDSettings? = nil) async throws -> [String: Any] {
         guard let device else { throw PadError.disconnected }
         guard pending == nil else { throw PadError.busy }
         nextID = nextID >= 998 ? 700 : nextID + 1
         let id = nextID
-        let frames = try OAIWire.request(method: method, id: id, map: map)
+        let frames = try OAIWire.request(method: method, id: id, map: map, led: led)
         return try await withCheckedThrowingContinuation { continuation in
             pending = (id, { continuation.resume(with: $0) })
             timeout = Timer.scheduledTimer(timeInterval: 3, target: self, selector: #selector(requestTimedOut), userInfo: nil, repeats: false)

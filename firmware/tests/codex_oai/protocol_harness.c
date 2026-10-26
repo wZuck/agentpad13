@@ -174,6 +174,8 @@ int main(void) {
             codex_oai_init();
         } else if (strcmp(line, "CORRUPT\n") == 0) {
             wear_store[OAI_KEYMAP_STORAGE_ADDRESS] ^= 0xFFU;
+        } else if (strcmp(line, "CORRUPT_LED\n") == 0) {
+            wear_store[OAI_LED_STORAGE_ADDRESS] ^= 0xFFU;
         } else if (strcmp(line, "LEGACY\n") == 0) {
             seed_legacy_keymap();
         } else if (strcmp(line, "CURRENT_LEGACY\n") == 0) {

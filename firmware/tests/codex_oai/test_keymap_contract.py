@@ -110,6 +110,20 @@ class KeymapContractTest(unittest.TestCase):
             source = self.keymap if token.startswith("handle_") or token.startswith("codex_oai_position") else (KEYMAP / "codex_oai.c").read_text()
             self.assertIn(token, source)
 
+    def test_local_led_settings_are_persisted_and_applied_at_the_output(self) -> None:
+        protocol = (KEYMAP / "codex_oai.c").read_text()
+        for token in (
+            "v.agentpad.led.get",
+            "v.agentpad.led.set",
+            "codex_oai_led_set",
+            "wear_leveling_write(OAI_LED_STORAGE_ADDRESS",
+            "invalid_led_settings",
+        ):
+            self.assertIn(token, protocol)
+        self.assertIn("codex_oai_led_get(&led_enabled, &led_brightness)", self.keymap)
+        self.assertEqual(self.keymap.count("codex_rgb_apply_led(frame[led]."), 3)
+        self.assertIn("codex_oai_reset_led()", self.keymap)
+
     def test_two_default_layers_are_table_driven_and_extensible(self) -> None:
         self.assertRegex(self.keymap, r"define CODEX_EXTRA_LAYERS\s+2")
         self.assertIn("#define CODEX_LAYER_COUNT (2 + CODEX_EXTRA_LAYERS)", self.keymap)
@@ -223,36 +237,25 @@ class KeymapContractTest(unittest.TestCase):
             with self.subTest(mapping=mapping):
                 self.assertIn(source, body)
 
-    def test_codex_layer_joystick_defaults_to_mouse_pointer(self) -> None:
+    def test_codex_layer_joystick_uses_session_navigation(self) -> None:
         config = (REPO / "firmware" / "loudest_micro" / "keymaps" / "codex_oai" / "config.h").read_text()
         source = (REPO / "firmware" / "loudest_micro" / "loudest_micro.c").read_text()
 
-        self.assertIn("#define CODEX_OAI_DEFAULT_JOYSTICK_MOUSE", config)
-        self.assertIn("#define CODEX_OAI_JOYSTICK_MOUSE_LAYER 0", config)
+        self.assertIn("#define CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS", config)
+        self.assertIn("#define CODEX_OAI_JOYSTICK_ACTIVE_LAYER 0", config)
         self.assertIn("#define CODEX_OAI_JOYSTICK_SWAP_XY", config)
-        self.assertIn("#define CODEX_OAI_MOUSE_EXTRA_DEADZONE 200", config)
-        self.assertIn("#define MOUSEKEY_MOVE_DELTA 1", config)
-        self.assertIn("#define MOUSEKEY_MAX_SPEED 20", config)
-        self.assertIn("#define MOUSEKEY_INTERVAL 20", config)
-        self.assertIn("QK_MOUSE_CURSOR_UP", source)
-        self.assertIn("QK_MOUSE_CURSOR_DOWN", source)
-        self.assertIn("QK_MOUSE_CURSOR_LEFT", source)
-        self.assertIn("QK_MOUSE_CURSOR_RIGHT", source)
-        self.assertIn("js_mode == JS_MODE_MOUSE", source)
-        self.assertIn("mousekey_on(js_mouse_kc[i])", source)
-        self.assertIn("mousekey_off(js_mouse_kc[i])", source)
-        self.assertIn("} else if (!want[i]) {\n            mousekey_off(js_mouse_kc[i]);", source)
-        self.assertIn("JS_MOUSE_SETTLE_MS 300", source)
-        self.assertIn("js_mouse_armed", source)
+        self.assertIn("#define CODEX_OAI_SESSION_DEADZONE 40", config)
+        self.assertNotIn("CODEX_OAI_DEFAULT_JOYSTICK_MOUSE", config)
         self.assertIn("*x           = raw_y;", source)
         self.assertIn("*y           = raw_x;", source)
-        self.assertIn("want[0] = (y > center_y + active_threshold_y);", source)
-        self.assertIn("want[1] = (y < center_y - active_threshold_y);", source)
-        self.assertIn("want[2] = (x > center_x + active_threshold_x);", source)
-        self.assertIn("want[3] = (x < center_x - active_threshold_x);", source)
-        self.assertIn("mouse_threshold_x = threshold_x + CODEX_OAI_MOUSE_EXTRA_DEADZONE;", source)
-        self.assertIn("release_threshold_x = (mouse_threshold_x * 3) / 4;", source)
+        self.assertIn("js_mode == JS_MODE_SESSIONS", source)
+        self.assertIn("JS_MODE_ARROWS", source)
+        self.assertNotIn("JS_MODE_MOUSE", source)
+        self.assertNotIn("QK_MOUSE_CURSOR", source)
         self.assertIn("!loudest_joystick_is_deflected()", self.keymap)
+        self.assertIn("!loudest_joystick_was_recently_deflected(750)", self.keymap)
+        self.assertIn("loudest_joystick_session_step(direction);", self.common)
+        self.assertIn("OAI_CONTROL_AG00 : OAI_CONTROL_AG01", self.keymap)
 
     def test_native_fallback_and_safety_contract(self) -> None:
         for token in (

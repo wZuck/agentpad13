@@ -74,6 +74,8 @@ static uint8_t  handshake_revision;
 static bool     last_event_was_error;
 static oai_slot_t slots[OAI_SLOT_COUNT];
 static uint8_t  oai_keymap[OAI_KEYMAP_POSITION_COUNT];
+static bool     led_enabled;
+static uint8_t  led_brightness;
 
 static const uint8_t default_oai_keymap[OAI_KEYMAP_POSITION_COUNT] = {
     OAI_KEYMAP_PREVIOUS,
@@ -156,6 +158,14 @@ typedef struct {
     uint8_t map[OAI_KEYMAP_POSITION_COUNT];
     uint8_t checksum;
 } oai_keymap_store_t;
+
+typedef struct {
+    uint8_t magic;
+    uint8_t version;
+    uint8_t enabled;
+    uint8_t brightness;
+    uint8_t checksum;
+} oai_led_store_t;
 
 static bool is_space(char value) {
     return value == ' ' || value == '\t' || value == '\r' || value == '\n';
@@ -249,6 +259,60 @@ static void keymap_load(void) {
 #endif
 }
 
+static uint8_t led_checksum(const oai_led_store_t *store) {
+    uint8_t checksum = (uint8_t)(OAI_LED_STORE_MAGIC ^ OAI_LED_STORE_VERSION);
+    checksum = (uint8_t)((checksum << 1) ^ (checksum >> 7) ^ store->enabled);
+    checksum = (uint8_t)((checksum << 1) ^ (checksum >> 7) ^ store->brightness);
+    return checksum;
+}
+
+static void led_defaults(void) {
+    led_enabled = true;
+    led_brightness = 100U;
+}
+
+static bool led_store_valid(const oai_led_store_t *store) {
+    return (
+        store->magic == OAI_LED_STORE_MAGIC
+        && store->version == OAI_LED_STORE_VERSION
+        && store->enabled <= 1U
+        && store->brightness <= 100U
+        && store->checksum == led_checksum(store)
+    );
+}
+
+static bool led_persist(void) {
+#if defined(CODEX_OAI_HAS_WEAR_LEVELING)
+    oai_led_store_t store = {
+        .magic = OAI_LED_STORE_MAGIC,
+        .version = OAI_LED_STORE_VERSION,
+        .enabled = led_enabled ? 1U : 0U,
+        .brightness = led_brightness,
+    };
+    store.checksum = led_checksum(&store);
+    return wear_leveling_write(OAI_LED_STORAGE_ADDRESS, &store, sizeof(store)) != WEAR_LEVELING_FAILED;
+#else
+    return true;
+#endif
+}
+
+static void led_load(void) {
+    led_defaults();
+#if defined(CODEX_OAI_HAS_WEAR_LEVELING)
+    oai_led_store_t store;
+    memset(&store, 0, sizeof(store));
+    if (
+        wear_leveling_read(OAI_LED_STORAGE_ADDRESS, &store, sizeof(store)) == WEAR_LEVELING_SUCCESS
+        && led_store_valid(&store)
+    ) {
+        led_enabled = store.enabled != 0U;
+        led_brightness = store.brightness;
+        return;
+    }
+    (void)led_persist();
+#endif
+}
+
 static void reset_rx(void) {
     rx_length = 0;
     container_depth = 0;
@@ -271,11 +335,42 @@ void codex_oai_init(void) {
     handshake_revision = 0;
     last_event_was_error = false;
     keymap_load();
+    led_load();
 }
 
 void codex_oai_reset_keymap(void) {
     keymap_defaults();
     keymap_persist();
+}
+
+void codex_oai_reset_led(void) {
+    led_defaults();
+    (void)led_persist();
+}
+
+bool codex_oai_led_get(bool *enabled, uint8_t *brightness) {
+    if (enabled == NULL || brightness == NULL) {
+        return false;
+    }
+    *enabled = led_enabled;
+    *brightness = led_brightness;
+    return true;
+}
+
+bool codex_oai_led_set(bool enabled, uint8_t brightness) {
+    if (brightness > 100U) {
+        return false;
+    }
+    bool previous_enabled = led_enabled;
+    uint8_t previous_brightness = led_brightness;
+    led_enabled = enabled;
+    led_brightness = brightness;
+    if (!led_persist()) {
+        led_enabled = previous_enabled;
+        led_brightness = previous_brightness;
+        return false;
+    }
+    return true;
 }
 
 bool codex_oai_keymap_get(uint8_t output[OAI_KEYMAP_POSITION_COUNT]) {
@@ -711,6 +806,21 @@ static bool parse_u32(const char *input, size_t length, size_t *offset, uint32_t
     return true;
 }
 
+static bool parse_bool(const char *input, size_t length, size_t *offset, bool *value) {
+    size_t cursor = skip_space(input, length, *offset);
+    if (cursor + 4U <= length && memcmp(&input[cursor], "true", 4) == 0) {
+        *value = true;
+        *offset = cursor + 4U;
+        return true;
+    }
+    if (cursor + 5U <= length && memcmp(&input[cursor], "false", 5) == 0) {
+        *value = false;
+        *offset = cursor + 5U;
+        return true;
+    }
+    return false;
+}
+
 static uint32_t scale_fraction_byte(uint32_t fraction, uint32_t denominator) {
     uint32_t quotient = 0;
     uint32_t remainder = 0;
@@ -993,6 +1103,68 @@ static bool parse_keymap_params(
     return cursor == end && has_layer && has_map == require_map;
 }
 
+static bool parse_led_params(
+    const char *input,
+    size_t start,
+    size_t end,
+    bool *has_enabled,
+    bool *enabled,
+    bool *has_brightness,
+    uint8_t *brightness
+) {
+    size_t cursor = skip_space(input, end, start);
+    if (cursor >= end || input[cursor++] != '{') {
+        return false;
+    }
+    *has_enabled = false;
+    *has_brightness = false;
+    bool need_member = true;
+    for (;;) {
+        cursor = skip_space(input, end, cursor);
+        if (cursor < end && input[cursor] == '}' && !need_member) {
+            ++cursor;
+            break;
+        }
+        char key[12];
+        if (!parse_plain_string(input, end, &cursor, key, sizeof(key))) {
+            return false;
+        }
+        cursor = skip_space(input, end, cursor);
+        if (cursor >= end || input[cursor++] != ':') {
+            return false;
+        }
+        if (strcmp(key, "on") == 0) {
+            if (*has_enabled || !parse_bool(input, end, &cursor, enabled)) {
+                return false;
+            }
+            *has_enabled = true;
+        } else if (strcmp(key, "brightness") == 0) {
+            uint32_t value;
+            if (*has_brightness || !parse_u32(input, end, &cursor, &value, 100U)) {
+                return false;
+            }
+            *brightness = (uint8_t)value;
+            *has_brightness = true;
+        } else {
+            return false;
+        }
+        need_member = false;
+        cursor = skip_space(input, end, cursor);
+        if (cursor < end && input[cursor] == ',') {
+            ++cursor;
+            need_member = true;
+            continue;
+        }
+        if (cursor < end && input[cursor] == '}') {
+            ++cursor;
+            break;
+        }
+        return false;
+    }
+    cursor = skip_space(input, end, cursor);
+    return cursor == end && (*has_enabled || *has_brightness);
+}
+
 static bool parse_request(
     const char *input,
     size_t length,
@@ -1133,6 +1305,29 @@ static void send_keymap_get_response(uint16_t id, const char map[OAI_KEYMAP_POSI
     raw_hid_send(report, OAI_REPORT_SIZE);
 }
 
+static void send_led_get_response(uint16_t id) {
+    uint8_t report[OAI_REPORT_SIZE] = {0};
+    uint8_t offset = 3;
+    report[0] = OAI_REPORT_ID;
+    report[1] = OAI_CHANNEL_RPC;
+    offset = append_text(report, offset, "{\"result\":{\"on\":");
+    offset = append_text(report, offset, led_enabled ? "true" : "false");
+    offset = append_text(report, offset, ",\"brightness\":");
+    if (led_brightness >= 100U) {
+        offset = append_text(report, offset, "100");
+    } else if (led_brightness >= 10U) {
+        report[offset++] = (uint8_t)('0' + led_brightness / 10U);
+        report[offset++] = (uint8_t)('0' + led_brightness % 10U);
+    } else {
+        report[offset++] = (uint8_t)('0' + led_brightness);
+    }
+    offset = append_text(report, offset, "},\"id\":");
+    offset = append_id(report, offset, id);
+    offset = append_text(report, offset, "}\r\n");
+    report[2] = (uint8_t)(offset - 3);
+    raw_hid_send(report, OAI_REPORT_SIZE);
+}
+
 static bool dispatch_request(const char *input, size_t length) {
     oai_request_t request;
     if (!parse_request(input, length, &request)) {
@@ -1172,6 +1367,29 @@ static bool dispatch_request(const char *input, size_t length) {
             || !codex_oai_keymap_set_hex(map, OAI_KEYMAP_POSITION_COUNT)
         ) {
             send_response("{\"error\":\"invalid_keymap\",\"id\":", request.id);
+            return false;
+        }
+        send_response("{\"result\":true,\"id\":", request.id);
+    } else if (strcmp(request.method, "v.agentpad.led.get") == 0) {
+        send_led_get_response(request.id);
+    } else if (strcmp(request.method, "v.agentpad.led.set") == 0) {
+        bool has_enabled = false;
+        bool has_brightness = false;
+        bool enabled = led_enabled;
+        uint8_t brightness = led_brightness;
+        if (
+            !parse_led_params(
+                input,
+                request.params_start,
+                request.params_end,
+                &has_enabled,
+                &enabled,
+                &has_brightness,
+                &brightness
+            )
+            || !codex_oai_led_set(enabled, brightness)
+        ) {
+            send_response("{\"error\":\"invalid_led_settings\",\"id\":", request.id);
             return false;
         }
         send_response("{\"result\":true,\"id\":", request.id);

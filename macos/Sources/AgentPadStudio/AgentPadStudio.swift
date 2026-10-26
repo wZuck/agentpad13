@@ -39,7 +39,7 @@ struct StudioView: View {
                         Text("CODEX").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(accent)
                         Text("第 1 层 · 13 个可配置按键").foregroundStyle(.secondary).font(.caption)
                         Spacer()
-                        Text(model.dirty ? "草稿" : "已同步").font(.caption).foregroundStyle(.secondary)
+                        Text(model.dirty || model.ledDirty ? "有未保存修改" : "已同步").font(.caption).foregroundStyle(.secondary)
                     }
                     board
                     HStack(spacing: 16) {
@@ -120,12 +120,53 @@ struct StudioView: View {
                 .font(.system(size: 11, design: .monospaced)).foregroundStyle(accent)
             Text(actionHelp).font(.caption).foregroundStyle(.secondary).lineSpacing(4).frame(minHeight: 72, alignment: .top)
             Divider()
+            lighting
+            Divider()
             Label("固定硬件行为", systemImage: "lock").font(.caption.bold())
             Text("编码器按压：ENC\nCODEX 旋转：推理强度\nTP5：CODEX → FN → NAV → MEDIA\n¹ 摇杆默认左右切换会话；FN 的 JS_MODE 可切换模式。")
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(5)
             Text("麦克风需与 Codex 的按键布局模式一致：合并模式使用 ACT10；分离模式使用 ACT11。未握手时两者均无语音快捷键回退。")
                 .font(.caption).foregroundStyle(.secondary).lineSpacing(4)
         }.disabled(model.busy)
+    }
+    private var lighting: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("LED 灯光", systemImage: "lightbulb.fill")
+                Spacer()
+                Toggle("", isOn: Binding(get: { model.led.isOn }, set: { model.led.isOn = $0 }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .accessibilityLabel("LED 灯光开关")
+            }.font(.caption.bold())
+            HStack(spacing: 10) {
+                Image(systemName: model.led.isOn ? "sun.max.fill" : "moon.fill")
+                    .foregroundStyle(model.led.isOn ? accent : .secondary)
+                    .frame(width: 18)
+                Slider(
+                    value: Binding(
+                        get: { Double(model.led.brightness) },
+                        set: { model.led.brightness = Int($0.rounded()) }
+                    ),
+                    in: 1...100,
+                    step: 1
+                )
+                .disabled(!model.led.isOn)
+                Text("\(model.led.brightness)%")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 38, alignment: .trailing)
+            }
+            HStack {
+                Text(model.ledSupported ? "亮度 1–100%" : "当前固件不支持灯光配置")
+                    .font(.caption2)
+                    .foregroundStyle(model.ledSupported ? Color(nsColor: .secondaryLabelColor) : Color.orange)
+                Spacer()
+                Button("应用灯光", action: model.saveLED)
+                    .controlSize(.small)
+                    .disabled(!model.canSaveLED)
+            }
+        }
     }
     private var actionHelp: String {
         switch model.map.values[model.selected] {

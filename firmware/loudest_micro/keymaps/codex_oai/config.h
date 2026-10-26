@@ -24,16 +24,11 @@
 #define RAW_EPSIZE 64
 #define RAW_REPORT_ID 6
 
-/* The joystick acts as a pointer on the CODEX layer; FN+SW1 cycles modes. */
-#define CODEX_OAI_DEFAULT_JOYSTICK_MOUSE
-#define CODEX_OAI_JOYSTICK_MOUSE_LAYER 0
+/* The CODEX layer defaults to left/right session navigation. */
+#define CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
+#define CODEX_OAI_JOYSTICK_ACTIVE_LAYER 0
 #define CODEX_OAI_JOYSTICK_SWAP_XY
-#define CODEX_OAI_MOUSE_EXTRA_DEADZONE 200
-
-/* Keep pointer control deliberately slow enough for precise UI selection. */
-#define MOUSEKEY_MOVE_DELTA 1
-#define MOUSEKEY_MAX_SPEED 20
-#define MOUSEKEY_INTERVAL 20
+#define CODEX_OAI_SESSION_DEADZONE 40
 
 /* K00 / physical [0,0] enters the normal QMK bootmagic-lite path. */
 #define BOOTMAGIC_LITE_ROW 0

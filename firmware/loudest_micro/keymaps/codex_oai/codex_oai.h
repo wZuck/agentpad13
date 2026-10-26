@@ -29,6 +29,10 @@
 #define OAI_KEYMAP_STORE_VERSION 3U
 #define OAI_KEYMAP_STORE_MAGIC 0xC7U
 
+#define OAI_LED_STORAGE_ADDRESS 96U
+#define OAI_LED_STORE_VERSION 1U
+#define OAI_LED_STORE_MAGIC 0xC8U
+
 typedef enum {
     OAI_KEYMAP_NOOP = 0,
     OAI_KEYMAP_PREVIOUS,
@@ -104,4 +108,7 @@ bool codex_oai_keymap_set(const uint8_t input[OAI_KEYMAP_POSITION_COUNT]);
 bool codex_oai_keymap_get_hex(char output[OAI_KEYMAP_POSITION_COUNT + 1]);
 bool codex_oai_keymap_set_hex(const char *input, size_t length);
 uint8_t codex_oai_keymap_action_for_position(uint8_t position);
+bool codex_oai_led_get(bool *enabled, uint8_t *brightness);
+bool codex_oai_led_set(bool enabled, uint8_t brightness);
+void codex_oai_reset_led(void);
 CODEX_OAI_KEEP void raw_hid_receive(uint8_t *data, uint8_t length);

@@ -400,6 +400,7 @@ static bool handle_dynamic_oai_position(uint8_t position, keyrecord_t *record) {
 void eeconfig_init_user(void) {
     eeconfig_update_user(0);
     codex_oai_reset_keymap();
+    codex_oai_reset_led();
 }
 
 void keyboard_post_init_user(void) {
@@ -445,13 +446,22 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
              * startup sweep is the deliberate input-free interval, so ignore
              * it rather than letting that edge cycle a fresh CODEX boot to
              * FN. */
-            if (pressed && !codex_led_startup_active(timer_read32()) && !loudest_joystick_is_deflected()) {
+            if (pressed && !codex_led_startup_active(timer_read32()) && !loudest_joystick_is_deflected() && !loudest_joystick_was_recently_deflected(750)) {
                 cycle_codex_layer();
             }
             return false;
         default:
             return true;
     }
+}
+
+void loudest_joystick_session_step(int8_t direction) {
+    if (direction == 0) {
+        return;
+    }
+    codex_oai_control_t control = direction < 0 ? OAI_CONTROL_AG00 : OAI_CONTROL_AG01;
+    (void)notify_or_native(control, true);
+    (void)notify_or_native(control, false);
 }
 
 CODEX_OAI_KEEP bool encoder_update_user(uint8_t index, bool clockwise) {
@@ -507,14 +517,17 @@ void housekeeping_task_user(void) {
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     codex_led_rgb_t frame[CODEX_LED_COUNT];
     uint8_t current_value = rgb_matrix_get_val();
+    bool led_enabled = true;
+    uint8_t led_brightness = 100U;
+    (void)codex_oai_led_get(&led_enabled, &led_brightness);
     codex_led_render(timer_read32(), frame);
 
     for (uint8_t led = led_min; led < led_max && led < CODEX_LED_COUNT; ++led) {
         rgb_matrix_set_color(
             led,
-            codex_rgb_cap_channel(frame[led].r, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-            codex_rgb_cap_channel(frame[led].g, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-            codex_rgb_cap_channel(frame[led].b, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS)
+            codex_rgb_apply_led(frame[led].r, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS, led_brightness, led_enabled),
+            codex_rgb_apply_led(frame[led].g, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS, led_brightness, led_enabled),
+            codex_rgb_apply_led(frame[led].b, current_value, RGB_MATRIX_MAXIMUM_BRIGHTNESS, led_brightness, led_enabled)
         );
     }
     return true;

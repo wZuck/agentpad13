@@ -168,6 +168,9 @@ class Harness:
     def corrupt_storage(self) -> HarnessResult:
         return self._command("CORRUPT")
 
+    def corrupt_led_storage(self) -> HarnessResult:
+        return self._command("CORRUPT_LED")
+
     def seed_legacy_keymap(self) -> HarnessResult:
         return self._command("LEGACY")
 
@@ -211,6 +214,31 @@ class Harness:
                 "id": request_id,
                 "params": {"l": layer, "m": mapping},
             },
+            separators=(",", ":"),
+        ).encode("ascii")
+        return self.rpc(message)
+
+    def led_get(self, request_id: int = 43) -> HarnessResult:
+        message = json.dumps(
+            {"method": "v.agentpad.led.get", "id": request_id, "params": {}},
+            separators=(",", ":"),
+        ).encode("ascii")
+        return self.rpc(message)
+
+    def led_set(
+        self,
+        *,
+        enabled: bool | None = None,
+        brightness: int | None = None,
+        request_id: int = 43,
+    ) -> HarnessResult:
+        params: dict[str, object] = {}
+        if enabled is not None:
+            params["on"] = enabled
+        if brightness is not None:
+            params["brightness"] = brightness
+        message = json.dumps(
+            {"method": "v.agentpad.led.set", "id": request_id, "params": params},
             separators=(",", ":"),
         ).encode("ascii")
         return self.rpc(message)
@@ -370,6 +398,56 @@ class ProtocolParityTest(unittest.TestCase):
             (make_report(
                 b'{"result":{"l":0,"m":"0123456789abcd0"},"id":42}\r\n'
             ),),
+        )
+
+    def test_led_get_returns_factory_defaults(self) -> None:
+        result = self.harness.led_get()
+        self.assertEqual(
+            result.sent,
+            (make_report(b'{"result":{"on":true,"brightness":100},"id":43}\r\n'),),
+        )
+        self.assertLessEqual(result.sent[0][2], 61)
+
+    def test_led_settings_update_partially_and_persist_across_reset(self) -> None:
+        accepted = self.harness.led_set(enabled=False, brightness=37)
+        self.assertEqual(
+            accepted.sent,
+            (make_report(b'{"result":true,"id":43}\r\n'),),
+        )
+        self.harness.reset()
+        self.assertEqual(
+            self.harness.led_get().sent,
+            (make_report(b'{"result":{"on":false,"brightness":37},"id":43}\r\n'),),
+        )
+        self.harness.led_set(enabled=True)
+        self.assertEqual(
+            self.harness.led_get().sent,
+            (make_report(b'{"result":{"on":true,"brightness":37},"id":43}\r\n'),),
+        )
+
+    def test_led_invalid_values_are_atomic_and_corruption_recovers(self) -> None:
+        self.harness.led_set(enabled=False, brightness=41)
+        for params in ({"brightness": 101}, {"on": "yes"}, {}):
+            with self.subTest(params=params):
+                message = json.dumps(
+                    {"method": "v.agentpad.led.set", "id": 43, "params": params},
+                    separators=(",", ":"),
+                ).encode("ascii")
+                rejected = self.harness.rpc(message)
+                self.assertEqual(
+                    rejected.sent,
+                    (make_report(b'{"error":"invalid_led_settings","id":43}\r\n'),),
+                )
+                self.assertEqual(
+                    self.harness.led_get().sent,
+                    (make_report(b'{"result":{"on":false,"brightness":41},"id":43}\r\n'),),
+                )
+
+        self.harness.corrupt_led_storage()
+        self.harness.reset()
+        self.assertEqual(
+            self.harness.led_get().sent,
+            (make_report(b'{"result":{"on":true,"brightness":100},"id":43}\r\n'),),
         )
 
     def test_keymap_set_accepts_microphone_action_digit(self) -> None:

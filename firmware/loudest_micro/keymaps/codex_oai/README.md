@@ -12,7 +12,7 @@ The keymap intentionally reproduces the local Codex Micro OAI LED endpoint:
 |---|---|
 | VID:PID | `303A:8360` |
 | Manufacturer / product | `hirlu` / `Codex Micro Lab OAI LED` |
-| Device version | `0x000E` |
+| Device version | `0x0013` |
 | Raw HID usage | `FF00:61` |
 | Report format | Report ID 6; 64 bytes total |
 
@@ -109,6 +109,28 @@ que forme parte de un mapa personalizado. Si la copia está ausente o corrupta
 se reinstala el mapa de fábrica. Un reset de EEPROM (`eeconfig_init_user`)
 también vuelve a los defaults.
 
+## Local LED control
+
+The same Raw HID channel exposes a persisted global LED setting:
+
+```json
+{"method":"v.agentpad.led.get","id":43,"params":{}}
+{"result":{"on":true,"brightness":100},"id":43}
+```
+
+```json
+{"method":"v.agentpad.led.set","id":44,"params":{"on":false,"brightness":37}}
+{"result":true,"id":44}
+```
+
+Brightness is an integer percentage from 0 through 100. Missing fields in a
+set request preserve their current values. The setting uses a separate
+checksummed wear-leveling record and is restored at boot. It scales every
+rendered channel, including task, action, layer and startup frames;
+`on:false` emits black. It does not change Codex task colours, the OAI
+handshake or the RGB matrix EEPROM state. Invalid fields or values are rejected
+atomically with `{"error":"invalid_led_settings","id":...}`.
+
 ## Layer behavior and native fallback
 
 The default firmware has four layers. TP5 is the only layer control and cycles
@@ -126,7 +148,7 @@ replace the OAI map at startup.
 
 | Layer | Grid defaults | Hero / encoder / touch |
 |---|---|---|
-| `CODEX` | OAI controls below; joystick is a mouse pointer | `SEND` / OAI `ENC` / TP5 layer cycle |
+| `CODEX` | OAI controls below; joystick left/right changes session | `SEND` / OAI `ENC` / TP5 layer cycle |
 | `FN` | `JS_MODE`, F2–F12 | media play / OAI `ENC` / TP5 layer cycle |
 | `NAV` | Escape, home/end, arrows, paging and editing | OAI `ENC` / TP5 cycle / `TP_TOG` |
 | `MEDIA` | media, volume and RGB controls | OAI `ENC` / TP5 layer cycle |
@@ -138,11 +160,15 @@ Additional extension layers remain compile-time opt-in through
 NAV so touch can be re-enabled after it has been disabled; TP5 itself remains
 the layer-cycle gesture while enabled.
 
-The CODEX layer defaults the joystick to relative mouse-pointer movement.
-Pushing farther from centre shortens the movement interval, and releasing the
-stick stops the pointer. FN-layer SW1 (`JS_MODE`) cycles
-`mouse -> arrows -> scroll -> gamepad`; calibration remains the same shared
+The CODEX layer defaults the joystick to session navigation. Left selects the
+previous session and right selects the next; up/down are ignored in this mode.
+Each direction fires once per deflection and re-arms only after the stick
+returns through the centre deadzone. FN-layer SW1 (`JS_MODE`) cycles
+`sessions -> arrows -> scroll -> gamepad`; calibration remains the same shared
 EEPROM store used by every joystick mode.
+
+TP5 layer cycling is blocked while the joystick is deflected and for 750 ms
+after its last output.
 
 Before the OAI handshake is ready, CODEX controls fall back to the proven
 native Codex shortcuts: AG00/AG01 previous/next, AG02 new task, AG03 review,
@@ -196,6 +222,9 @@ The 24-pixel RGB chain is rendered locally from the six OAI task slots and the
 endpoint link state. The direct keymap owns the renderer; the older AgentPad
 status renderer is bypassed only for this keymap.
 
+The global power/brightness record from `v.agentpad.led.get/set` applies after
+the task/link frame is rendered and before it reaches the physical chain.
+
 | LEDs | Meaning |
 |---|---|
 | 0–5 | one RGB task slot per LED (six slots) |
@@ -221,7 +250,7 @@ build leaves it disabled.
 
 ## Power-on LED self-check
 
-After each USB power-up the firmware runs a one-shot physical-chain check:
+When LED power is enabled, each USB power-up runs a one-shot physical-chain check:
 LEDs **1 → 24** (renderer indexes `0..23`) light one at a time in white for
 80 ms each. The complete chain then flashes green twice and normal task/link
 rendering resumes after approximately 2.28 seconds. If RGB had been disabled,
@@ -229,6 +258,9 @@ the keymap enables it with the `*_noeeprom` API and keeps it active for the
 task/link renderer; no EEPROM or OAI event is written. This proves
 the local WS2812 data path and ordering, but it does not prove USB enumeration,
 the OAI handshake, or task notifications; those remain separate checks.
+If the app-level LED switch is off, the same frames are rendered black,
+including the startup diagnostic; opening the app and enabling LEDs restores
+the normal local output.
 
 ## Safe build and validation
 
@@ -240,8 +272,8 @@ requires Vial-QMK commit `00fc4627`, the local VIA pre-hook and Raw HID
 Report-ID patches, initialized submodules, and Arm GNU Toolchain 15.2.Rel1. It
 publishes only
 [`release/firmware/prebuilt/agentpad13_codex_oai.uf2`](../../../../release/firmware/prebuilt/agentpad13_codex_oai.uf2)
-after clean builds pass. The current candidate is 93,184 bytes with SHA-256
-`46d6207b08cad29a333d8af0dc1416648efd37a5c65c5e86c30897a6f02e5a20`.
+after clean builds pass. The current candidate is 94,208 bytes with SHA-256
+`247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`.
 
 Run the complete host gate from the repository root with
 `python3 -m unittest discover -s firmware/tests/codex_oai -p 'test_*.py'`.

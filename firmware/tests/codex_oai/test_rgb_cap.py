@@ -34,7 +34,19 @@ int main(void) {
             }
         }
     }
-    return codex_rgb_cap_channel(255, 255, 105) == 105 ? 0 : 2;
+    if (codex_rgb_cap_channel(255, 255, 105) != 105) {
+        return 2;
+    }
+    if (codex_rgb_apply_led(255, 255, 105, 100, true) != 105) {
+        return 3;
+    }
+    if (codex_rgb_apply_led(255, 255, 105, 50, true) > 53) {
+        return 4;
+    }
+    if (codex_rgb_apply_led(255, 255, 105, 50, false) != 0) {
+        return 5;
+    }
+    return 0;
 }
 '''
         with tempfile.TemporaryDirectory(prefix="agentpad13_rgb_cap_") as directory:
@@ -53,7 +65,7 @@ int main(void) {
     def test_keymap_caps_only_the_physical_output_path(self) -> None:
         source = (KEYMAP / "keymap.c").read_text(encoding="utf-8")
         self.assertIn("rgb_matrix_get_val()", source)
-        self.assertEqual(source.count("codex_rgb_cap_channel(frame[led]."), 3)
+        self.assertEqual(source.count("codex_rgb_apply_led(frame[led]."), 3)
         self.assertIn("RGB_MATRIX_MAXIMUM_BRIGHTNESS", source)
 
 

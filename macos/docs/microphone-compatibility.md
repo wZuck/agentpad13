@@ -2,7 +2,7 @@
 
 ## 已确认
 
-- 系统枚举到实验键盘 `303A:8360`、固件 USB 版本 `0x0012`、Raw HID `FF00:61`。
+- 诊断时系统枚举到实验键盘 `303A:8360`、固件 USB 版本 `0x0012`、Raw HID `FF00:61`。
 - 配置应用显示设备映射已同步：SW12 / K11 为 `f`，即 ACT11。
 - 当前 Codex Micro 日志中，`v.oai.rgbcfg` 和 `v.oai.thstatus` 均收到成功响应；因此“从未握手”不足以解释此次问题。
 - 本机客户端的静态事件处理明确在 `separateMicrophoneKeys=false` 时忽略 ACT11，而用 ACT10 处理合并麦克风槽。
