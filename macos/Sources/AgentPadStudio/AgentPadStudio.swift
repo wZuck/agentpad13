@@ -138,6 +138,7 @@ struct StudioView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .accessibilityLabel("LED 灯光开关")
+                    .disabled(!model.ledSupported)
             }.font(.caption.bold())
             HStack(spacing: 10) {
                 Image(systemName: model.led.isOn ? "sun.max.fill" : "moon.fill")
@@ -151,7 +152,7 @@ struct StudioView: View {
                     in: 1...100,
                     step: 1
                 )
-                .disabled(!model.led.isOn)
+                .disabled(!model.ledSupported || !model.led.isOn)
                 Text("\(model.led.brightness)%")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)

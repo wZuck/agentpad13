@@ -17,6 +17,7 @@ final class PadModel: ObservableObject {
     @Published var led = LEDSettings.factory
     @Published var ledBaseline: LEDSettings?
     @Published var ledSupported = true
+    @Published var deviceVersion: Int?
     private let transport = HIDTransport()
     var dirty: Bool { map != baseline }
     var ledDirty: Bool { led != ledBaseline }
@@ -28,6 +29,7 @@ final class PadModel: ObservableObject {
             self?.connected = false
             self?.baseline = nil
             self?.ledBaseline = nil
+            self?.deviceVersion = nil
             self?.status = "USB 连接已断开；草稿已保留。"
         }
         if demo { status = "演示模式 · 所有修改仅在本地，不访问 USB。" }
@@ -47,12 +49,22 @@ final class PadModel: ObservableObject {
             self.connected = true
             self.baseline = nil
             self.ledBaseline = nil
-            self.ledSupported = true
-            try await self.readMap()
-            if await self.readLEDIfSupported() {
-                self.status = "已读取键位与灯光配置。"
-            } else {
-                self.status = "已读取键位；此设备固件不支持灯光配置。"
+            self.deviceVersion = target.version
+            self.ledSupported = target.version >= 0x0013
+            do {
+                try await self.readMap()
+                if await self.readLEDIfSupported() {
+                    self.status = "已读取键位与灯光配置。"
+                } else {
+                    self.status = "已读取键位；固件 \(Self.versionLabel(target.version)) 不支持灯光配置。"
+                }
+            } catch {
+                self.transport.disconnect()
+                self.connected = false
+                self.baseline = nil
+                self.ledBaseline = nil
+                self.deviceVersion = nil
+                throw error
             }
         }
     }
@@ -61,6 +73,7 @@ final class PadModel: ObservableObject {
         connected = false
         baseline = nil
         ledBaseline = nil
+        deviceVersion = nil
         status = "已断开；草稿已保留。"
     }
     func read() {
@@ -92,6 +105,11 @@ final class PadModel: ObservableObject {
     }
     @discardableResult
     private func readLEDIfSupported() async -> Bool {
+        if let deviceVersion, deviceVersion < 0x0013 {
+            ledSupported = false
+            ledBaseline = nil
+            return false
+        }
         do {
             try await readLED()
             return true
@@ -100,6 +118,9 @@ final class PadModel: ObservableObject {
             ledBaseline = nil
             return false
         }
+    }
+    private static func versionLabel(_ version: Int) -> String {
+        String(format: "v%04X", version)
     }
     func save() {
         guard canSave else { return }

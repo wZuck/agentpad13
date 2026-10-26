@@ -4,11 +4,14 @@ import AgentPadCore
 
 // All IOKit callbacks and request state live on the main run loop. Opening
 // without seize permits Codex Desktop to keep using the same endpoint.
-final class HIDTransport: NSObject {
+// Request state is confined to the main run loop; the unchecked conformance
+// documents that contract for the delayed timeout closure.
+final class HIDTransport: NSObject, @unchecked Sendable {
     struct Device: Identifiable {
         let id: Int
         let label: String
         let handle: IOHIDDevice
+        let version: Int
     }
     private let manager: IOHIDManager
     private var device: IOHIDDevice?
@@ -16,7 +19,7 @@ final class HIDTransport: NSObject {
     private var decoder = RPCDecoder()
     private var nextID: UInt16 = UInt16.random(in: 700...990)
     private var pending: (id: UInt16, completion: (Result<[String: Any], Error>) -> Void)?
-    private var timeout: Timer?
+    private var pendingGeneration: UInt64 = 0
     var onDisconnect: (() -> Void)?
 
     override init() {
@@ -52,7 +55,14 @@ final class HIDTransport: NSObject {
         return devices.map { handle in
             let location = (IOHIDDeviceGetProperty(handle, kIOHIDLocationIDKey as CFString) as? NSNumber)?.intValue ?? 0
             let serial = IOHIDDeviceGetProperty(handle, kIOHIDSerialNumberKey as CFString) as? String ?? ""
-            return Device(id: location, label: "OAI · USB \(String(location, radix: 16)) \(serial)", handle: handle)
+            let version = (IOHIDDeviceGetProperty(handle, kIOHIDVersionNumberKey as CFString) as? NSNumber)?.intValue ?? 0
+            let renderedVersion = String(format: "v%04X", version)
+            return Device(
+                id: location,
+                label: "OAI · \(renderedVersion) · USB \(String(location, radix: 16)) \(serial)",
+                handle: handle,
+                version: version
+            )
         }.sorted { $0.id < $1.id }
     }
 
@@ -89,9 +99,13 @@ final class HIDTransport: NSObject {
         nextID = nextID >= 998 ? 700 : nextID + 1
         let id = nextID
         let frames = try OAIWire.request(method: method, id: id, map: map, led: led)
+        pendingGeneration &+= 1
+        let generation = pendingGeneration
         return try await withCheckedThrowingContinuation { continuation in
             pending = (id, { continuation.resume(with: $0) })
-            timeout = Timer.scheduledTimer(timeInterval: 3, target: self, selector: #selector(requestTimedOut), userInfo: nil, repeats: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                self?.requestTimedOut(generation: generation)
+            }
             for frame in frames {
                 let result = frame.withUnsafeBufferPointer {
                     IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, 6, $0.baseAddress!, frame.count)
@@ -104,7 +118,8 @@ final class HIDTransport: NSObject {
         }
     }
 
-    @objc private func requestTimedOut() {
+    private func requestTimedOut(generation: UInt64) {
+        guard generation == pendingGeneration, pending != nil else { return }
         decoder.reset()
         finish(.failure(PadError.timeout))
     }
@@ -127,8 +142,6 @@ final class HIDTransport: NSObject {
     }
 
     private func finish(_ result: Result<[String: Any], Error>) {
-        timeout?.invalidate()
-        timeout = nil
         let completion = pending?.completion
         pending = nil
         completion?(result)
