@@ -18,8 +18,12 @@
 #define OAI_CHANNEL_DEBUG 1
 #define OAI_CHANNEL_RPC 2
 #define OAI_MAX_PAYLOAD 61
-#define OAI_RX_CAPACITY 512
-#define OAI_MAX_JSON_DEPTH 8
+#define OAI_RX_CAPACITY 4608
+#define OAI_MAX_JSON_DEPTH 16
+#define OAI_MAX_LAYERS 16
+/* Semantic version for Input's device.status/sys.version queries. The suffix
+ * identifies this QMK implementation rather than claiming stock WL firmware. */
+#define OAI_FIRMWARE_VERSION "0.0.28-agentpad13"
 #ifndef OAI_SLOT_COUNT
 #    define OAI_SLOT_COUNT 6
 #endif
@@ -28,6 +32,11 @@
 #define OAI_KEYMAP_STORAGE_ADDRESS 64U
 #define OAI_KEYMAP_STORE_VERSION 3U
 #define OAI_KEYMAP_STORE_MAGIC 0xC7U
+
+uint8_t codex_pad_layer_count(void);
+uint8_t codex_pad_action(uint8_t layer, uint8_t position);
+void codex_pad_color(uint8_t layer, uint8_t *r, uint8_t *g, uint8_t *b);
+void codex_pad_reset(void);
 
 #define OAI_LED_STORAGE_ADDRESS 96U
 #define OAI_LED_STORE_VERSION 1U

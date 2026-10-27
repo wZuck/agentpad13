@@ -10,11 +10,18 @@
 
 static codex_oai_task_t tasks[OAI_SLOT_COUNT];
 static uint8_t active_mask;
+static uint8_t custom_color[4][3];
+static bool custom_set[4];
+void codex_pad_color(uint8_t layer, uint8_t *r, uint8_t *g, uint8_t *b) {
+    if (layer >= 4 || !custom_set[layer]) return;
+    *r = custom_color[layer][0]; *g = custom_color[layer][1]; *b = custom_color[layer][2];
+}
 
 static void reset(void) {
     memset(tasks, 0, sizeof(tasks));
     for (uint8_t index = 0; index < OAI_SLOT_COUNT; ++index) tasks[index].source_slot = index;
     active_mask = 0;
+    memset(custom_set, 0, sizeof(custom_set));
     codex_led_init();
 }
 
@@ -46,6 +53,9 @@ int main(void) {
             codex_led_set_tasks(tasks, active_mask, (uint32_t)now_ms);
         } else if (sscanf(line, "LINK %u %lu", &state, &now_ms) == 2 && state <= OAI_LINK_ERROR) {
             codex_led_set_link((oai_link_state_t)state, (uint32_t)now_ms);
+        } else if (sscanf(line, "COLOR %u %u %u %u", &state, &red, &green, &blue) == 4 && state < 4) {
+            custom_set[state] = true;
+            custom_color[state][0] = (uint8_t)red; custom_color[state][1] = (uint8_t)green; custom_color[state][2] = (uint8_t)blue;
         } else if (sscanf(line, "LAYER %u %lu", &state, &now_ms) == 2) {
             codex_led_set_layer((uint8_t)state, (uint32_t)now_ms);
         } else if (sscanf(line, "ACTION %u %u %lu", &led, &pressed, &now_ms) == 3) {

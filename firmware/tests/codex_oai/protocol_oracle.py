@@ -311,7 +311,7 @@ class Engine:
             self._saw_thstatus = True
             prefix = '{"result":true,"id":'
         elif method == "device.status":
-            prefix = '{"result":{},"id":'
+            prefix = '{"result":{"version":"0.0.28-agentpad13"},"id":'
         else:
             return ()
         message = (prefix + str(request_id) + "}\r\n").encode("ascii")

@@ -16,7 +16,8 @@
 #include "codex_oai.h"
 #include "wear_leveling.h"
 
-static uint8_t wear_store[256];
+static uint8_t wear_store[4096];
+static bool fail_next_write;
 
 static void write_keymap(uint8_t version, const uint8_t map[OAI_KEYMAP_POSITION_COUNT]) {
     uint8_t checksum = (uint8_t)(OAI_KEYMAP_STORE_MAGIC ^ version);
@@ -71,6 +72,7 @@ wear_leveling_status_t wear_leveling_erase(void) {
 }
 
 wear_leveling_status_t wear_leveling_write(uint32_t address, const void *value, size_t length) {
+    if (fail_next_write) { fail_next_write = false; return WEAR_LEVELING_FAILED; }
     if (value == NULL || address > sizeof(wear_store) || length > sizeof(wear_store) - address) {
         return WEAR_LEVELING_FAILED;
     }
@@ -172,6 +174,20 @@ int main(void) {
         sent_count = 0;
         if (strcmp(line, "RESET\n") == 0) {
             codex_oai_init();
+        } else if (strcmp(line, "FAILWRITE\n") == 0) {
+            fail_next_write = true;
+        } else if (strcmp(line, "CORRUPT_INPUT\n") == 0) {
+            wear_store[192] ^= 0xFFU;
+        } else if (strcmp(line, "LEGACY_PAD\n") == 0) {
+            memset(wear_store + 192, 0, sizeof(wear_store) - 192);
+            wear_store[112] = 0xCA; wear_store[113] = 1;
+            uint8_t sum = 0xCA;
+            for (unsigned i = 0; i < 64; ++i) {
+                uint8_t value = (i % 16 < 13) ? (42 + i / 16) : (12 + i % 16);
+                wear_store[114 + i] = value;
+                sum = (uint8_t)((sum << 1) ^ (sum >> 7) ^ value);
+            }
+            wear_store[178] = sum;
         } else if (strcmp(line, "CORRUPT\n") == 0) {
             wear_store[OAI_KEYMAP_STORAGE_ADDRESS] ^= 0xFFU;
         } else if (strcmp(line, "CORRUPT_LED\n") == 0) {

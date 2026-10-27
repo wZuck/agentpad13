@@ -364,15 +364,16 @@ static const task_context_t *global_task(void) {
 }
 
 static codex_led_rgb_t layer_rgb(void) {
-    return layer_colors[layer_index % (sizeof(layer_colors) / sizeof(layer_colors[0]))];
+    codex_led_rgb_t color = layer_colors[layer_index % (sizeof(layer_colors) / sizeof(layer_colors[0]))];
+    codex_pad_color(layer_index, &color.r, &color.g, &color.b);
+    return color;
 }
 
 static codex_led_rgb_t layer_indicator_rgb(uint32_t now_ms) {
     codex_led_rgb_t output = layer_rgb();
 
-    /* LED 13 is the authoritative layer indicator.  In particular, CODEX
-     * must remain red while the direct OAI endpoint is still waiting: tinting
-     * it amber made a fresh CODEX boot indistinguishable from the FN layer. */
+    /* LED 13 always follows the configured layer color, including while the
+     * OAI endpoint is waiting. Factory CODEX red must not turn FN amber. */
 #if CODEX_LED_ANIMATION_ENABLE
     if (link_state != OAI_LINK_READY) {
         uint8_t level = fade_level(now_ms - link_started_ms, LED_LINK_FADE_PERIOD_MS);

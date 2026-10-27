@@ -61,8 +61,8 @@ locked `Codex Micro Lab OAI LED` identity (`303A:8360`, usage `FF00:61`, Report
 ID 6, 64-byte reports).
 
 The current artifact is
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 94,208 bytes, SHA-256
-`247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`.
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, 119,808 bytes, SHA-256
+`eb462190390f01ddbf819da7c2d6d20b806df4de9099a40b7dc34f4225492aff`.
 Start with the [keymap contract](firmware/loudest_micro/keymaps/codex_oai/README.md),
 [source hand-off](firmware/CODEX-OAI-SOURCE.md), and
 [Direct OAI build procedure](firmware/BUILD.md#agentpad13-direct-oai-experimental-alternative).
@@ -82,10 +82,11 @@ operation requires the literal authorization and observation record in the
 ## macOS key configuration
 
 [AgentPad Studio](macos/README.md) is a native macOS app for the experimental
-`codex_oai` firmware. Edit the 13 physical keys, read/write the device map,
-control LED power and brightness, and import/export JSON profiles. Saves are
+`codex_oai` firmware. Edit all four layers (CODEX, FN, NAV, MEDIA), assign each
+layer's TP5 indicator color, control LED power and brightness, and import/export JSON profiles. Saves are
 acknowledged and verified by readback.
-Encoder press, TP5 layer cycling and auxiliary layers follow the firmware's fixed behavior.
+Firmware v0014 enables the additional layers and indicator colors; older firmware
+retains its supported controls. Encoder behavior and TP5 layer cycling stay fixed.
 
 ```sh
 macos/scripts/build-app.sh
@@ -94,6 +95,11 @@ open 'macos/dist/AgentPad Studio.app'
 
 Requires macOS 13+ and Swift 5.9+ to build. See the app guide for offline demo,
 protocol limits and validation. This does not change the recommended Vial firmware.
+
+The experimental v001C OAI firmware supports Input 1.0.2 key editing through a
+shared `keymap.json` for 4–16 layers, including native keys on CODEX, while retaining AgentPad
+Studio configuration. Fixed controls, macros and other limits are documented
+in the [compatibility scope and checks](docs/input-compatibility.zh-CN.md).
 
 ## First power-on
 

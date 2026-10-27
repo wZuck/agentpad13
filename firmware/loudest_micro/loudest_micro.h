@@ -22,7 +22,7 @@ enum loudest_keycodes {
 
 bool loudest_joystick_is_deflected(void);
 bool loudest_joystick_was_recently_deflected(uint32_t window_ms);
-void loudest_joystick_session_step(int8_t direction);
+void loudest_joystick_layer_step(int8_t direction);
 
 // ---------------------------------------------------------------------------
 // Raw-HID status protocol v1 - LOCKED. Wire counterpart and single source of

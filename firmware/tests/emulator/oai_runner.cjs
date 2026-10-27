@@ -148,7 +148,7 @@ function readOaiFrame(frame) {
 }
 
 function requireAck(frames, expected) {
-  return frames.some((frame) => readOaiFrame(frame) === expected);
+  return frames.map(readOaiFrame).filter(Boolean).join('').includes(expected);
 }
 
 function reportDescriptorMatches(report) {
@@ -190,6 +190,13 @@ function main() {
       if (offset === 0x0c) adc.checkInterrupts();
       return value;
     };
+    // Match real silicon: START_ONCE self-clears after each conversion.
+    // Without this rp2040js leaves axis conversions one sample behind.
+    const originalWrite = adc.writeUint32.bind(adc);
+    adc.writeUint32 = (offset, value) => {
+      originalWrite(offset, value);
+      if (offset === 0x00) adc.cs &= ~(1 << 2);
+    };
     adc.channelValues[0] = 2048;
     adc.channelValues[1] = 2048;
   }
@@ -213,6 +220,7 @@ function main() {
   let interfaces = [];
   let deviceDescriptor = Buffer.alloc(0);
   const rawFrames = [];
+  const keyboardFrames = [];
   const rawTxQueue = [];
   const armedReads = new Map();
   let reportDescriptor = Buffer.alloc(0);
@@ -279,6 +287,8 @@ function main() {
       return;
     }
     const raw = rawInterface();
+    const keyboard = keyboardHid(interfaces);
+    if (keyboard && endpoint === keyboard.inEp) keyboardFrames.push(bytes);
     if (raw && endpoint === raw.inEp) {
       rawFrames.push(rawFrame(bytes));
       log(`raw IN ${bytes.length}B`);
@@ -386,6 +396,10 @@ function main() {
     return {
       acknowledged: requireAck(rawFrames.slice(before), ack),
       fragmentCount: reports.length,
+      response: rawFrames.slice(before).map(readOaiFrame).filter(Boolean).join('').split('\n')
+        .filter(line => line.trim().startsWith('{')).map(line => {
+          try { return JSON.parse(line); } catch { return null; }
+        }).find(message => message && message.id === JSON.parse(json).id),
     };
   }
 
@@ -399,7 +413,41 @@ function main() {
   const thstatusAck = thstatusResult.acknowledged;
   runForMicros(250000);
   const edgesAfterStatus = gp17Edges;
-  const deviceStatusAck = rpc('{"method":"device.status","id":3,"params":{}}', '{"result":{},"id":3}\r\n').acknowledged;
+  const deviceStatusAck = rpc('{"method":"device.status","id":3,"params":{}}', '{"result":{"version":"0.0.28-agentpad13"},"id":3}\r\n').acknowledged;
+  const inputVersionAck = rpc('{"method":"sys.version","params":null,"id":998}', '{"result":{"version":"0.0.28-agentpad13"},"id":998}\r\n').acknowledged;
+  const inputListing = rpc('{"method":"fs.list","params":{"checksum":true},"id":997}').response;
+  const inputFilesAck = inputListing?.result?.[0]?.name === 'keymap.json';
+  const inputUnsupportedAck = rpc('{"method":"fs.delete","params":{"file":"keymap.json"},"id":996}', '{"error":{"code":-32601,"message":"Unsupported on AgentPad13"},"id":996}\r\n').acknowledged;
+
+  // Input's actual file workflow, followed by a Studio read and a physical
+  // key scan. Restore the original document before the existing regressions.
+  const inputOriginal = rpc('{"method":"fs.read","params":{"file":"keymap.json"},"id":990}').response?.result;
+  let inputKeymapVerified = !!inputOriginal;
+  function inputWrite(document, id) {
+    const bytes = Buffer.from(JSON.stringify(document));
+    let ok = true;
+    for (let offset = 0; offset < bytes.length; offset += 3072) {
+      ok &&= rpc(JSON.stringify({method: 'fs.writebin', id, params: {
+        file: 'keymap.json', data: bytes.subarray(offset, offset + 3072).toString('base64'),
+        offset, append: true, completed: offset + 3072 >= bytes.length,
+      }}), `{"result":true,"id":${id}}\r\n`).acknowledged;
+    }
+    return ok;
+  }
+  if (inputOriginal) {
+    const modified = structuredClone(inputOriginal);
+    modified.profiles[0].layers[0].layout.keymap[0][0] = 'KC_A';
+    inputKeymapVerified &&= inputWrite(modified, 991);
+    const listing = rpc('{"method":"fs.list","params":{"checksum":true},"id":992}').response?.result?.[0];
+    inputKeymapVerified &&= listing?.checksum === crypto.createHash('sha1').update(JSON.stringify(modified)).digest('hex');
+    const studio = rpc('{"method":"v.agentpad.cfg.get","params":{"l":0},"id":993}').response?.result;
+    inputKeymapVerified &&= studio?.m.startsWith('2a');
+    const beforeNative = keyboardFrames.length;
+    mcu.gpio[12].setInputValue(false); runForMicros(30000);
+    mcu.gpio[12].setInputValue(true); runForMicros(30000);
+    inputKeymapVerified &&= keyboardFrames.slice(beforeNative).some(frame => frame.subarray(2).includes(4));
+    inputKeymapVerified &&= inputWrite(inputOriginal, 994);
+  }
 
   const beforeKey = rawFrames.length;
   mcu.gpio[12].setInputValue(false);
@@ -407,6 +455,112 @@ function main() {
   mcu.gpio[12].setInputValue(true);
   runForMicros(150000);
   const keyFrame = rawFrames.slice(beforeKey).map(readOaiFrame).find((json) => json === '{"method":"v.oai.hid","params":{"k":"AG00","act":1}}\r\n');
+
+  // Configure every layer through the production USB endpoint, including
+  // response fragmentation. Then exercise a native mapping and release it
+  // after TP5 changes layer while the key remains held.
+  let layerConfigVerified = true;
+  for (let layer = 0; layer < 4; layer++) {
+    const mapping = Buffer.from([42, ...Array(12).fill(0), 12, 34, 56]).toString('hex');
+    const setID = 710 + layer * 2, getID = setID + 1;
+    layerConfigVerified &&= rpc(JSON.stringify({method: 'v.agentpad.cfg.set', id: setID, params: {l: layer, m: mapping}}), `{"result":true,"id":${setID}}\r\n`).acknowledged;
+    layerConfigVerified &&= rpc(JSON.stringify({method: 'v.agentpad.cfg.get', id: getID, params: {l: layer}}), `{"result":{"l":${layer},"m":"${mapping}"},"id":${getID}}\r\n`).acknowledged;
+  }
+  mcu.gpio[16].setInputValue(false);
+  runForMicros(100000);
+  function touch() {
+    mcu.gpio[16].setInputValue(true); runForMicros(30000);
+    mcu.gpio[16].setInputValue(false); runForMicros(30000);
+  }
+  touch(); // CODEX -> FN
+  const beforeNative = keyboardFrames.length;
+  mcu.gpio[12].setInputValue(false); runForMicros(100000);
+  const nativePress = keyboardFrames.slice(beforeNative).some(frame => frame.subarray(2).includes(4)); // KC_A
+  touch(); // FN -> NAV, with A still held
+  const beforeRelease = keyboardFrames.length;
+  mcu.gpio[12].setInputValue(true); runForMicros(100000);
+  const nativeRelease = keyboardFrames.slice(beforeRelease).some(frame => frame.every(byte => byte === 0));
+
+  // CODEX now supports native overrides too. Restore its dynamic OAI
+  // bindings before using OAI notifications as the joystick's layer marker.
+  const codexDefault = Buffer.from([...Array(13).fill(0), 255, 0, 0]).toString('hex');
+  if (!rpc(JSON.stringify({method: 'v.agentpad.cfg.set', id: 729, params: {l: 0, m: codexDefault}}), '{"result":true,"id":729}\r\n').acknowledged) {
+    throw new Error('CODEX fixture restore failed');
+  }
+  // Distinct native keys identify FN/NAV/MEDIA without inspecting RAM.
+  for (let layer = 1; layer < 4; layer++) {
+    const mapping = Buffer.from([41 + layer, ...Array(12).fill(0), 12, 34, 56]).toString('hex');
+    if (!rpc(JSON.stringify({method: 'v.agentpad.cfg.set', id: 730 + layer, params: {l: layer, m: mapping}}), `{"result":true,"id":${730 + layer}}\r\n`).acknowledged) {
+      throw new Error('joystick fixture configuration failed');
+    }
+  }
+  function expectLayer(layer) {
+    const beforeKeyboard = keyboardFrames.length, beforeRaw = rawFrames.length;
+    mcu.gpio[12].setInputValue(false); runForMicros(30000);
+    mcu.gpio[12].setInputValue(true); runForMicros(30000);
+    const matched = layer === 0
+      ? rawFrames.slice(beforeRaw).map(readOaiFrame).includes('{"method":"v.oai.hid","params":{"k":"AG00","act":1}}\r\n')
+      : keyboardFrames.slice(beforeKeyboard).some(frame => frame.subarray(2).includes(3 + layer));
+    if (!matched) console.error(`Expected layer ${layer}; keyboard=${keyboardFrames.slice(beforeKeyboard).map(f => f.toString('hex'))}; raw=${rawFrames.slice(beforeRaw).map(readOaiFrame)}`);
+    return matched;
+  }
+  function stick(value, duration = 30000) {
+    // The physical horizontal axis is GP27 after CODEX's XY swap.
+    mcu.adc.channelValues[1] = value; runForMicros(duration);
+  }
+  const beforeJoystick = rawFrames.length;
+  let joystickLayersVerified = expectLayer(2); // previous touch left us on NAV
+  stick(0); joystickLayersVerified &&= expectLayer(3);
+  stick(0, 300000); joystickLayersVerified &&= expectLayer(3); // hold cannot repeat
+  stick(4095); joystickLayersVerified &&= expectLayer(3); // reversal needs centre first
+  stick(2048); stick(0); joystickLayersVerified &&= expectLayer(0); // forward wrap
+  stick(2048); stick(0); joystickLayersVerified &&= expectLayer(1);
+  stick(2048); stick(4095); joystickLayersVerified &&= expectLayer(0);
+  stick(2048); stick(4095); joystickLayersVerified &&= expectLayer(3); // reverse wrap
+  stick(2048); stick(4095); joystickLayersVerified &&= expectLayer(2);
+  stick(2048); stick(4095); joystickLayersVerified &&= expectLayer(1);
+  stick(2048);
+  mcu.adc.channelValues[0] = 0; runForMicros(30000);
+  joystickLayersVerified &&= expectLayer(1); // up/down does not change layers
+  mcu.adc.channelValues[0] = 2048; runForMicros(800000);
+  const joystickSessionEvents = rawFrames.slice(beforeJoystick).map(readOaiFrame)
+    .filter(json => json && json.includes('"k":"AG01"'));
+  touch(); joystickLayersVerified &&= expectLayer(2); // TP5 still works after cooldown
+
+  // Reproduce Input's Add Layer defaults and cross the original four-layer
+  // boundary through the actual file protocol. Then visit layer 16 by a
+  // mapped key, TP5 and the joystick; no RAM state is used as an oracle.
+  const expanded = structuredClone(inputOriginal);
+  for (let index=4;index<16;index++) {
+    const layer = structuredClone(expanded.profiles[0].layers[0]);
+    layer.id=index; layer.name=`Layer ${index+1}`;
+    layer.layout.keymap=layer.layout.keymap.map(row => row.map(() => 'KC_NONE'));
+    layer.layout.keymap[0][0]='KC_Z';
+    layer.layout.encoders=[['KC_NONE','KC_NONE','KC_NONE']];
+    layer.layout.joystick={type:'RADIAL',sectors:[{k:'KI_X',a1:0.1875,a2:0.3125},{k:'KC_NONE',a1:0.3125,a2:0.1875}]};
+    expanded.profiles[0].layers.push(layer);
+  }
+  expanded.profiles[0].layers[2].layout.keymap[0][1]='KI_LS16';
+  let inputExtraLayersVerified=inputWrite(expanded, 940);
+  const countInfo=rpc('{"method":"v.agentpad.cfg.info","params":{},"id":941}').response?.result;
+  inputExtraLayersVerified &&= countInfo?.n===16;
+  const lastLayer=rpc('{"method":"v.agentpad.cfg.get","params":{"l":15},"id":942}').response?.result;
+  inputExtraLayersVerified &&= lastLayer?.m.startsWith('43'); // Studio's Z = 67.
+  mcu.gpio[9].setInputValue(false); runForMicros(30000);
+  mcu.gpio[9].setInputValue(true); runForMicros(30000);
+  function expectExtended(codex) {
+    const kb=keyboardFrames.length, raw=rawFrames.length;
+    mcu.gpio[12].setInputValue(false); runForMicros(30000);
+    mcu.gpio[12].setInputValue(true); runForMicros(30000);
+    return codex ? rawFrames.slice(raw).map(readOaiFrame).includes('{"method":"v.oai.hid","params":{"k":"AG00","act":1}}\r\n')
+      : keyboardFrames.slice(kb).some(frame => frame.subarray(2).includes(29));
+  }
+  inputExtraLayersVerified &&= expectExtended(false);
+  touch(); inputExtraLayersVerified &&= expectExtended(true); // 16 -> CODEX
+  stick(2048); stick(4095); inputExtraLayersVerified &&= expectExtended(false); // CODEX -> 16
+  stick(2048); stick(0); inputExtraLayersVerified &&= expectExtended(true); // 16 -> CODEX
+  stick(2048);
+  inputExtraLayersVerified &&= rpc('{"method":"v.agentpad.cfg.info","params":{"n":4},"id":943}').response?.result?.n===4;
 
   const vid = deviceDescriptor.length >= 12 ? deviceDescriptor.readUInt16LE(8) : 0;
   const pid = deviceDescriptor.length >= 12 ? deviceDescriptor.readUInt16LE(10) : 0;
@@ -428,6 +582,14 @@ function main() {
     rgbcfg_ack: rgbcfgAck,
     thstatus_ack: thstatusAck,
     device_status_ack: deviceStatusAck,
+    input_recognition_rpc_verified: inputVersionAck && inputFilesAck && inputUnsupportedAck,
+    input_keymap_read_write_verified: inputKeymapVerified,
+    input_extra_layers_verified: inputExtraLayersVerified,
+    layer_configuration_verified: layerConfigVerified,
+    joystick_layers_verified: joystickLayersVerified,
+    joystick_no_session_events: joystickSessionEvents.length === 0,
+    native_mapping_press: nativePress,
+    native_mapping_release_after_layer_change: nativeRelease,
     task_status: visibleStatus,
     task_status_fragment_count: thstatusResult.fragmentCount,
     key_event: keyFrame ? { k: 'AG00', act: 1 } : null,
@@ -443,7 +605,10 @@ function main() {
     evidence.vid_pid === '303a:8360', evidence.descriptor_verified,
     evidence.keyboard_hid_enumerated, evidence.oai_hid_enumerated,
     evidence.rgbcfg_ack, evidence.thstatus_ack, evidence.device_status_ack,
+    evidence.input_recognition_rpc_verified, evidence.input_keymap_read_write_verified, evidence.input_extra_layers_verified,
     evidence.task_status_fragment_count > 1, evidence.key_event !== null, evidence.ws2812_activity,
+    evidence.layer_configuration_verified, evidence.native_mapping_press, evidence.native_mapping_release_after_layer_change,
+    evidence.joystick_layers_verified, evidence.joystick_no_session_events,
   ];
   if (!checks.every(Boolean)) throw new Error(`OAI smoke failed; evidence written to ${evidencePath}`);
   // rp2040js may leave a scheduling timer alive after the synchronous smoke;

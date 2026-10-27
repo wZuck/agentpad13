@@ -17,6 +17,65 @@ final class AgentPadCoreTests: XCTestCase {
         XCTAssertEqual(custom.hex, "f23456789abfc01", "Fixed/legacy slots must survive editing unchanged")
     }
 
+    func testFourLayerProfilesAndValidation() throws {
+        let layers = PadLayer.allCases.map { LayerConfiguration.factory($0) }
+        let profile = PadProfile(map: try Keymap(), layers: layers, led: .factory)
+        let data = try JSONEncoder().encode(profile)
+        let (_, decoded, led) = try JSONDecoder().decode(PadProfile.self, from: data).validated()
+        XCTAssertEqual(layers, decoded)
+        XCTAssertEqual(led, .factory)
+        for layer in PadLayer.allCases {
+            XCTAssertEqual(try LayerConfiguration(hex: layers[layer.rawValue].hex), layers[layer.rawValue])
+        }
+        XCTAssertThrowsError(try LayerConfiguration(hex: String(repeating: "ff", count: 16)))
+        XCTAssertThrowsError(try LayerConfiguration(hex: "abcd"))
+        XCTAssertEqual(Keymap(nativeActions: layers[1].actions).action(at: 0).wire, "JS_MODE")
+    }
+
+    func testInputNativeCatalogAndCodexOverrides() throws {
+        let map = try Keymap()
+        var layer = LayerConfiguration.factory(.codex)
+        layer.actions[0] = 42
+        layer.actions[1] = 98
+        layer.actions[2] = 82
+        let display = map.nativeDisplay(overrides: layer.actions)
+        XCTAssertEqual(display.action(at: 0).wire, "KC_A")
+        XCTAssertEqual(display.action(at: 1).wire, "KC_LCTL")
+        XCTAssertEqual(display.action(at: 2).wire, "KC_NONE")
+        XCTAssertEqual(display.action(at: 3).wire, "KV_OAI_AG03")
+        XCTAssertEqual(try LayerConfiguration(hex: layer.hex), layer)
+        XCTAssertEqual(PadAction.native.count, 168)
+        let profile = PadProfile(map: map, layers: [layer] + PadLayer.allCases.dropFirst().map { LayerConfiguration.factory($0) }, led: .factory)
+        let decoded = try JSONDecoder().decode(PadProfile.self, from: JSONEncoder().encode(profile))
+        XCTAssertEqual(try decoded.validated().1[0], layer)
+    }
+
+    func testDynamicLayerProfilesAndCountRequests() throws {
+        let layers = PadLayer.configured(16).map { LayerConfiguration.factory($0) }
+        XCTAssertEqual(layers.count, 16)
+        XCTAssertEqual(PadLayer(rawValue: 15)?.title, "LAYER 16")
+        XCTAssertNil(PadLayer(rawValue: 16))
+        let profile = PadProfile(map: try Keymap(), layers: layers, led: .factory)
+        XCTAssertEqual(try JSONDecoder().decode(PadProfile.self, from: JSONEncoder().encode(profile)).validated().1, layers)
+        let frames = try OAIWire.request(method: "v.agentpad.cfg.info", id: 701, layerCount: 16)
+        let payload = try frames.flatMap { try OAIWire.payload($0) }
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(payload)) as? [String: Any])
+        XCTAssertEqual((json["params"] as? [String: Any])?["n"] as? Int, 16)
+        XCTAssertThrowsError(try OAIWire.request(method: "v.agentpad.cfg.info", id: 701, layerCount: 17))
+    }
+
+    func testKeycapLegendsCoverInputAndLayerActionsWithoutLegacyIndexing() throws {
+        XCTAssertEqual(PadAction.all[1].keycapTitle, "上个会话")
+        for action in PadAction.native {
+            XCTAssertEqual(action.keycapTitle, action.title)
+        }
+        XCTAssertEqual(PadAction.native[83].keycapTitle, "Codex 上一个")
+        XCTAssertEqual(PadAction.native[151].keycapTitle, "切到层 16")
+        XCTAssertEqual(PadAction(id: 999, title: "扩展动作", wire: "FUTURE").keycapTitle, "扩展动作")
+        let display = try Keymap().nativeDisplay(overrides: LayerConfiguration.factory(.codex).actions)
+        for index in 0..<13 { XCTAssertFalse(display.action(at: index).keycapTitle.isEmpty) }
+    }
+
     func testFramingAndDecoder() throws {
         let frames = try OAIWire.request(method: "v.oai.keymap.set", id: 701, map: Keymap())
         XCTAssertThrowsError(try OAIWire.request(method: "v.oai.keymap.get", id: 999))
@@ -70,11 +129,20 @@ final class AgentPadCoreTests: XCTestCase {
         XCTAssertEqual(compile.terminationStatus, 0)
         guard compile.terminationStatus == 0 else { return }
         let candidate = try Keymap(hex: "f23456789abfcd1")
+        var native = LayerConfiguration.factory(.nav)
+        native.actions[0] = 40
+        native.color = [12, 34, 56]
         let requests = try OAIWire.request(method: "v.oai.keymap.get", id: 701)
             + OAIWire.request(method: "v.oai.keymap.set", id: 702, map: candidate)
             + OAIWire.request(method: "v.oai.keymap.get", id: 703)
             + OAIWire.request(method: "v.agentpad.led.set", id: 704, led: LEDSettings(isOn: false, brightness: 37))
             + OAIWire.request(method: "v.agentpad.led.get", id: 705)
+            + OAIWire.request(method: "v.agentpad.cfg.set", id: 706, layer: 2, configuration: native)
+            + OAIWire.request(method: "v.agentpad.cfg.get", id: 707, layer: 2)
+            + OAIWire.request(method: "v.agentpad.cfg.info", id: 708, layerCount: 8)
+            + OAIWire.request(method: "v.agentpad.cfg.set", id: 709, layer: 7, configuration: native)
+            + OAIWire.request(method: "v.agentpad.cfg.get", id: 710, layer: 7)
+            + OAIWire.request(method: "v.agentpad.cfg.info", id: 711)
         var commands = ""
         for (index, frame) in requests.enumerated() {
             if index == requests.count - 1 { commands += "RESET\n" }
@@ -97,8 +165,8 @@ final class AgentPadCoreTests: XCTestCase {
             let bytes = stride(from: 0, to: hex.count, by: 2).compactMap { UInt8(String(hex[$0..<$0+2]), radix: 16) }
             responses += try decoder.receive(bytes)
         }
-        XCTAssertEqual(responses.count, 5)
-        guard responses.count == 5 else { return }
+        XCTAssertEqual(responses.count, 11)
+        guard responses.count == 11 else { return }
         XCTAssertEqual((responses.first?["result"] as? [String: Any])?["m"] as? String, Keymap.factoryHex)
         XCTAssertEqual(responses[1]["result"] as? Bool, true)
         XCTAssertEqual((responses[2]["result"] as? [String: Any])?["m"] as? String, candidate.hex)
@@ -108,5 +176,14 @@ final class AgentPadCoreTests: XCTestCase {
         XCTAssertEqual(ledResult["on"] as? Bool, false)
         XCTAssertEqual((ledResult["brightness"] as? NSNumber)?.intValue, 37)
         XCTAssertEqual(responses[4]["id"] as? Int, 705)
+        XCTAssertEqual(responses[5]["result"] as? Bool, true)
+        let nativeResult = try XCTUnwrap(responses[6]["result"] as? [String: Any])
+        XCTAssertEqual(nativeResult["l"] as? Int, 2)
+        XCTAssertEqual(nativeResult["m"] as? String, native.hex)
+        XCTAssertEqual((responses[7]["result"] as? [String: Any])?["n"] as? Int, 8)
+        XCTAssertEqual(responses[8]["result"] as? Bool, true)
+        XCTAssertEqual((responses[9]["result"] as? [String: Any])?["l"] as? Int, 7)
+        XCTAssertEqual((responses[9]["result"] as? [String: Any])?["m"] as? String, native.hex)
+        XCTAssertEqual((responses[10]["result"] as? [String: Any])?["n"] as? Int, 8)
     }
 }

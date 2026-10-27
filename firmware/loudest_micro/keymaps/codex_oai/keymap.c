@@ -2,7 +2,7 @@
 // Direct Codex Desktop OAI keymap for AgentPad13.
 //
 // The default build exposes CODEX, FN, NAV and MEDIA. Native Codex shortcuts
-// are a routing fallback, not hidden layers; TP5 cycles the visible layers.
+// are a routing fallback, not hidden layers; TP5 and the joystick cycle layers.
 // Human layer 1 is L_CODEX (QMK index 0), the only layer owned by OAI RPC.
 #include QMK_KEYBOARD_H
 
@@ -10,17 +10,8 @@
 #include "codex_oai.h"
 #include "codex_rgb_cap.h"
 
-#ifndef CODEX_EXTRA_LAYERS
-#    define CODEX_EXTRA_LAYERS 2
-#endif
-
-/* Add user layers by increasing CODEX_EXTRA_LAYERS, adding their LAYOUT rows
- * below, and appending them to codex_layer_order. Two extension layers are
- * shipped; a third transparent custom layer remains available at build time. */
-#if CODEX_EXTRA_LAYERS > 3
-#    error "CODEX_EXTRA_LAYERS is limited to the three declared extension layers"
-#endif
-#define CODEX_LAYER_COUNT (2 + CODEX_EXTRA_LAYERS)
+// Native rows are compiled for all runtime-configurable layers.
+#define CODEX_LAYER_COUNT OAI_MAX_LAYERS
 
 enum codex_layers {
     L_CODEX = 0,
@@ -94,46 +85,32 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_F9,    KC_F10,   KC_F11,   KC_F12,
         CODEX_FN_HERO,       OAI_ENC, CODEX_TOUCH_LAYER
     ),
-#if CODEX_EXTRA_LAYERS > 0
     [L_USER2] = LAYOUT(
         KC_ESC,  KC_HOME, KC_UP,   KC_END,
         KC_LEFT, KC_DOWN, KC_RGHT, KC_PGUP,
         KC_PGDN, KC_DEL,  KC_BSPC, TP_TOG,
         KC_TRNS,           OAI_ENC, CODEX_TOUCH_LAYER
     ),
-#endif
-#if CODEX_EXTRA_LAYERS > 1
     [L_USER3] = LAYOUT(
         KC_MUTE, KC_VOLD, KC_VOLU, KC_MPLY,
         KC_MPRV, KC_MNXT, KC_MSTP, KC_CALC,
         RGB_TOG, RGB_MOD, RGB_HUI, RGB_HUD,
         KC_TRNS,           OAI_ENC, CODEX_TOUCH_LAYER
     ),
-#endif
-#if CODEX_EXTRA_LAYERS > 2
-    [L_USER4] = LAYOUT(
-        KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
-        KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
-        KC_TRNS, KC_TRNS, KC_TRNS, TP_TOG,
-        KC_TRNS,           OAI_ENC, CODEX_TOUCH_LAYER
-    ),
-#endif
+    [4] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [5] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [6] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [7] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [8] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [9] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [10] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [11] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [12] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [13] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [14] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
+    [15] = LAYOUT(KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, OAI_ENC, CODEX_TOUCH_LAYER),
 };
 /* clang-format on */
-
-static const uint8_t codex_layer_order[CODEX_LAYER_COUNT] = {
-    L_CODEX,
-    L_FN,
-#if CODEX_EXTRA_LAYERS > 0
-    L_USER2,
-#endif
-#if CODEX_EXTRA_LAYERS > 1
-    L_USER3,
-#endif
-#if CODEX_EXTRA_LAYERS > 2
-    L_USER4,
-#endif
-};
 
 static uint32_t accept_timer;
 static uint32_t new_timer;
@@ -210,7 +187,7 @@ static void clear_codex_arm(void) {
 }
 
 static void select_codex_layer(uint8_t layer) {
-    if (layer >= CODEX_LAYER_COUNT) {
+    if (layer >= codex_pad_layer_count()) {
         layer = CODEX_OAI_LAYER;
     }
     layer_move(layer);
@@ -218,17 +195,11 @@ static void select_codex_layer(uint8_t layer) {
     codex_led_set_layer(layer, timer_read32());
 }
 
-static void cycle_codex_layer(void) {
+static void step_codex_layer(int8_t direction) {
     uint8_t current = get_highest_layer(layer_state | default_layer_state);
-    uint8_t selected = 0;
-
-    for (uint8_t index = 0; index < CODEX_LAYER_COUNT; ++index) {
-        if (codex_layer_order[index] == current) {
-            selected = (uint8_t)((index + 1U) % CODEX_LAYER_COUNT);
-            break;
-        }
-    }
-    select_codex_layer(codex_layer_order[selected]);
+    uint8_t count=codex_pad_layer_count();
+    uint8_t selected=(uint8_t)((current+(direction<0 ? count-1U : 1U))%count);
+    select_codex_layer(selected);
 }
 
 static bool native_control(codex_oai_control_t control, bool pressed) {
@@ -359,9 +330,8 @@ static uint8_t codex_oai_feedback_led(uint8_t position) {
     return position;
 }
 
-static bool handle_dynamic_oai_position(uint8_t position, keyrecord_t *record) {
+static bool handle_oai_action(uint8_t action, uint8_t position, keyrecord_t *record) {
     bool pressed = record->event.pressed;
-    uint8_t action = codex_oai_keymap_action_for_position(position);
     codex_oai_control_t control;
 
     if (action == OAI_KEYMAP_NOOP || !codex_oai_control_for_action(action, &control)) {
@@ -397,10 +367,15 @@ static bool handle_dynamic_oai_position(uint8_t position, keyrecord_t *record) {
     return handle_oai_control(control, pressed, codex_oai_feedback_led(position));
 }
 
+static bool handle_dynamic_oai_position(uint8_t position, keyrecord_t *record) {
+    return handle_oai_action(codex_oai_keymap_action_for_position(position), position, record);
+}
+
 void eeconfig_init_user(void) {
     eeconfig_update_user(0);
     codex_oai_reset_keymap();
     codex_oai_reset_led();
+    codex_pad_reset();
 }
 
 void keyboard_post_init_user(void) {
@@ -427,6 +402,7 @@ void keyboard_post_init_user(void) {
 }
 
 void matrix_scan_user(void) {
+    if (get_highest_layer(layer_state | default_layer_state) >= codex_pad_layer_count()) select_codex_layer(0);
     if (!codex_oai_ready() && safe_pressed && !codex_armed && timer_elapsed32(safe_timer) >= CX_SAFE_ARM_TERM) {
         codex_armed = true;
     }
@@ -447,7 +423,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
              * it rather than letting that edge cycle a fresh CODEX boot to
              * FN. */
             if (pressed && !codex_led_startup_active(timer_read32()) && !loudest_joystick_is_deflected() && !loudest_joystick_was_recently_deflected(750)) {
-                cycle_codex_layer();
+                step_codex_layer(1);
             }
             return false;
         default:
@@ -455,13 +431,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 }
 
-void loudest_joystick_session_step(int8_t direction) {
-    if (direction == 0) {
+void loudest_joystick_layer_step(int8_t direction) {
+    if (direction == 0 || codex_led_startup_active(timer_read32())) {
         return;
     }
-    codex_oai_control_t control = direction < 0 ? OAI_CONTROL_AG00 : OAI_CONTROL_AG01;
-    (void)notify_or_native(control, true);
-    (void)notify_or_native(control, false);
+    step_codex_layer(direction);
 }
 
 CODEX_OAI_KEEP bool encoder_update_user(uint8_t index, bool clockwise) {
@@ -531,4 +505,58 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         );
     }
     return true;
+}
+
+// Cache the resolved press so releases still match after a layer/config change.
+bool codex_pad_process_record(keyrecord_t *record) {
+    static bool routing;
+    static uint8_t held[13];
+    static bool active[13];
+    static const uint16_t codes[] = {
+#define PAD_ACTION(id, wire, code) code,
+#include "native_actions.def"
+#undef PAD_ACTION
+    };
+    if (routing) return true;
+    uint8_t row = record->event.key.row, col = record->event.key.col;
+    if (row > 3 || col > 3 || (row == 3 && col != 0)) return true;
+    uint8_t position = row * 4 + col;
+    if (record->event.pressed) {
+        uint8_t layer = get_highest_layer(layer_state | default_layer_state);
+        if (layer >= codex_pad_layer_count()) return true;
+        uint8_t action = codex_pad_action(layer, position);
+        if (action >= sizeof(codes) / sizeof(codes[0])) return false;
+        // CODEX zero and transparent bindings resolve to the existing OAI map.
+        if ((layer == 0 && action == 0) || action == 1)
+            action = 82 + codex_oai_keymap_action_for_position(position);
+        held[position] = action;
+        active[position] = true;
+    } else if (!active[position]) return true;
+    uint8_t action = held[position];
+    if (action >= 82 && action < 98) {
+        if (!record->event.pressed) active[position] = false;
+        return handle_oai_action(action - 82, position, record);
+    }
+    if (action>=136) {
+        uint8_t target=(action-136)%16;
+        if (target<codex_pad_layer_count()) {
+            if (action<152 && record->event.pressed) select_codex_layer(target);
+            if (action>=152) {
+                if (record->event.pressed) layer_on(target);
+                else layer_off(target);
+            }
+        }
+        if (!record->event.pressed) active[position]=false;
+        return false;
+    }
+    uint16_t code = codes[action];
+    routing = true;
+    bool standard = process_record_quantum_helper(code, record);
+    routing = false;
+    if (standard) {
+        if (record->event.pressed) register_code16(code);
+        else unregister_code16(code);
+    }
+    if (!record->event.pressed) active[position] = false;
+    return false;
 }

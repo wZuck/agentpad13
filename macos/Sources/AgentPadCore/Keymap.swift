@@ -37,12 +37,27 @@ public struct PadAction: Identifiable {
         .init(id: 14, title: "麦克风（合并模式）", wire: "ACT10 · MICROPHONE"),
         .init(id: 15, title: "麦克风（分离模式）", wire: "ACT11")
     ]
+    /// Compact legends apply only to the legacy OAI catalog. Native actions
+    /// have their own IDs, including Input's KV_* and KI_* bindings.
+    public var keycapTitle: String {
+        let titles = ["无操作", "上个会话", "下个会话", "新建任务", "审查", "计划", "实现", "重构", "测试", "中止", "解锁", "确认", "发送", "编码器", "麦克风", "麦克风"]
+        guard Self.all.indices.contains(id), Self.all[id].wire == wire else { return title }
+        return titles[id]
+    }
     public static let editable = all.filter { $0.id != 13 }
 }
 
 public struct Keymap: Equatable, Sendable {
     public static let factoryHex = "123456789abecd1"
     public private(set) var values: [Int]
+    private var native = false
+    public init(nativeActions: [Int]) { values = nativeActions; native = true }
+    public func nativeDisplay(overrides: [Int]) -> Keymap {
+        Keymap(nativeActions: overrides.enumerated().map { position, action in
+            action == 0 || action == 1 ? 82 + values[position] : action
+        })
+    }
+    public func action(at index: Int) -> PadAction { (native ? PadAction.native : PadAction.all)[values[index]] }
     public init(hex: String = Keymap.factoryHex) throws {
         let parsed = hex.compactMap { Int(String($0), radix: 16) }
         guard hex.utf8.count == 15, parsed.count == 15,
@@ -106,7 +121,8 @@ public enum OAIWire {
         method: String,
         id: UInt16,
         map: Keymap? = nil,
-        led: LEDSettings? = nil
+        led: LEDSettings? = nil,
+        layer: Int = 0, configuration: LayerConfiguration? = nil, layerCount: Int? = nil, fileOffset: Int? = nil
     ) throws -> [[UInt8]] {
         guard id <= 998 else { throw PadError.invalidReport }
         var params: [String: Any] = [:]
@@ -114,6 +130,18 @@ public enum OAIWire {
             params["l"] = 0
         }
         if let map { params["m"] = map.hex }
+        if method.hasPrefix("v.agentpad.cfg.") && method != "v.agentpad.cfg.info" { params["l"] = layer }
+        if let layerCount {
+            guard (4...16).contains(layerCount) else { throw PadError.invalidProfile }
+            params["n"] = layerCount
+        }
+        if method == "fs.readbin" {
+            guard let offset = fileOffset, (0...16384).contains(offset) else { throw PadError.invalidReport }
+            params["file"] = "keymap.json"
+            params["offset"] = offset
+            params["len"] = 192
+        }
+        if let configuration { params["m"] = configuration.hex }
         if let led {
             params["on"] = led.isOn
             params["brightness"] = led.brightness

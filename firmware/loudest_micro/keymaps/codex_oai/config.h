@@ -15,8 +15,9 @@
 
 #define VENDOR_ID 0x303A
 #define PRODUCT_ID 0x8360
-#define DEVICE_VER 0x0013
-#define MANUFACTURER "hirlu"
+#define DEVICE_VER 0x001C
+#define CODEX_PAD_CONFIGURABLE
+#define MANUFACTURER "ZiyiWang"
 #define PRODUCT "Codex Micro Lab OAI LED"
 
 #define RAW_USAGE_PAGE 0xFF00
@@ -24,11 +25,10 @@
 #define RAW_EPSIZE 64
 #define RAW_REPORT_ID 6
 
-/* The CODEX layer defaults to left/right session navigation. */
-#define CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
-#define CODEX_OAI_JOYSTICK_ACTIVE_LAYER 0
+/* Left/right cycles layers from every layer; one step per deflection. */
+#define CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
 #define CODEX_OAI_JOYSTICK_SWAP_XY
-#define CODEX_OAI_SESSION_DEADZONE 40
+#define CODEX_OAI_LAYER_DEADZONE 40
 
 /* K00 / physical [0,0] enters the normal QMK bootmagic-lite path. */
 #define BOOTMAGIC_LITE_ROW 0

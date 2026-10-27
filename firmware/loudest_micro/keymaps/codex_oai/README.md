@@ -11,8 +11,8 @@ The keymap intentionally reproduces the local Codex Micro OAI LED endpoint:
 | Property | Value |
 |---|---|
 | VID:PID | `303A:8360` |
-| Manufacturer / product | `hirlu` / `Codex Micro Lab OAI LED` |
-| Device version | `0x0013` |
+| Manufacturer / product | `ZiyiWang` / `Codex Micro Lab OAI LED` |
+| Device version | `0x001C` |
 | Raw HID usage | `FF00:61` |
 | Report format | Report ID 6; 64 bytes total |
 
@@ -21,6 +21,13 @@ the regular AgentPad13 identity, and it must not be shipped as the normal
 `default` or `vial` firmware.
 
 ## Direct endpoint
+
+Input 1.0.2 can read and write the shared `keymap.json` through the filesystem
+RPC adapter. Four default layers can be extended to sixteen; thirteen keys per layer support native and Codex
+bindings; Studio reads the same mappings. Version queries return
+`0.0.28-agentpad13`; USB identity is preserved apart from `bcdDevice=0x001C`.
+Encoder/joystick reassignment, macros and extra profiles are rejected. See the
+[compatibility report](../../../../docs/input-compatibility.zh-CN.md).
 
 Codex Desktop talks straight to the keyboard's Raw HID endpoint. There is no
 Python helper, daemon, bridge, Vial protocol, or Vial configuration interface
@@ -133,7 +140,7 @@ atomically with `{"error":"invalid_led_settings","id":...}`.
 
 ## Layer behavior and native fallback
 
-The default firmware has four layers. TP5 is the only layer control and cycles
+The default firmware has four layers. TP5 cycles
 `CODEX -> FN -> NAV -> MEDIA -> CODEX`. Its input is intentionally ignored
 during the 2.28-second power-on LED self-check, which filters the TTP223
 settling edge and preserves the CODEX boot layer. The encoder press always
@@ -148,23 +155,25 @@ replace the OAI map at startup.
 
 | Layer | Grid defaults | Hero / encoder / touch |
 |---|---|---|
-| `CODEX` | OAI controls below; joystick left/right changes session | `SEND` / OAI `ENC` / TP5 layer cycle |
+| `CODEX` | OAI controls below; joystick left/right changes layer | `SEND` / OAI `ENC` / TP5 layer cycle |
 | `FN` | `JS_MODE`, F2–F12 | media play / OAI `ENC` / TP5 layer cycle |
 | `NAV` | Escape, home/end, arrows, paging and editing | OAI `ENC` / TP5 cycle / `TP_TOG` |
 | `MEDIA` | media, volume and RGB controls | OAI `ENC` / TP5 layer cycle |
 
 The FN/NAV/MEDIA rows are intentionally ordinary keymap data in `keymap.c`:
 users can replace them without touching the OAI parser or LED renderer.
-Additional extension layers remain compile-time opt-in through
-`CODEX_EXTRA_LAYERS` (up to the three declared extension rows). `TP_TOG` lives on
+Input and the layer-count RPC can add extension layers up to sixteen without
+a rebuild. TP5 and joystick navigation use the persisted layer count. `TP_TOG` lives on
 NAV so touch can be re-enabled after it has been disabled; TP5 itself remains
 the layer-cycle gesture while enabled.
 
-The CODEX layer defaults the joystick to session navigation. Left selects the
-previous session and right selects the next; up/down are ignored in this mode.
+The joystick defaults to layer navigation on every layer. Left selects the
+previous layer and right selects the next, wrapping around
+`CODEX <-> FN <-> NAV <-> MEDIA <-> CODEX`; up/down are ignored in this mode.
+Like TP5, joystick layer changes are ignored during the startup LED self-check.
 Each direction fires once per deflection and re-arms only after the stick
 returns through the centre deadzone. FN-layer SW1 (`JS_MODE`) cycles
-`sessions -> arrows -> scroll -> gamepad`; calibration remains the same shared
+`layers -> arrows -> scroll -> gamepad`; calibration remains the same shared
 EEPROM store used by every joystick mode.
 
 TP5 layer cycling is blocked while the joystick is deflected and for 750 ms
@@ -212,7 +221,7 @@ route. The normal `AG00` action remains on K00.
 
 When the endpoint is ready, encoder rotation sends `ENC_CW` or `ENC_CC` and an
 encoder press sends `ENC` on every layer. The encoder never changes layers;
-TP5 alone cycles the layer table without generating an OAI control. `[0,0]` is
+TP5 and joystick left/right cycle the layer table without generating an OAI control. `[0,0]` is
 also the ordinary Bootmagic Lite recovery position; that recovery behaviour
 remains QMK-native.
 
@@ -289,3 +298,22 @@ For the temporary Raspberry Pi Pico bench, use the pin-by-pin jumper guide in
 The current host/build/emulator evidence and the still-pending physical matrix
 are recorded in
 [`../../../../docs/codex-oai-prehardware-results.md`](../../../../docs/codex-oai-prehardware-results.md).
+
+### Four-layer configuration (USB firmware v0014)
+
+AgentPad Studio edits CODEX, FN, NAV and MEDIA independently and assigns an
+RGB color to the physical TP5 layer indicator (LED 13). Black disables the
+indicator for that layer; global LED power and brightness still apply.
+Task-state LEDs retain their OAI colors. Encoder and touch cycling stay fixed.
+
+`v.agentpad.cfg.get/set` accepts `l` in 0-3. Set additionally accepts `m`,
+exactly 32 hex characters: thirteen bounded native action IDs and three RGB
+bytes. CODEX action bytes are reserved; its OAI actions continue using the
+original keymap RPC at layer zero. Get echoes `l` and `m` in fragmented HID
+responses terminated by CRLF. Invalid configuration is rejected before writing.
+The versioned, checksummed record occupies wear-leveling bytes 112-178,
+preserving existing CODEX, global LED and joystick calibration records.
+Native bindings pass through QMK quantum processing; release uses the action
+cached at press time even after a layer or configuration change.
+Multi-layer app saves are sequential and can partially succeed; failures
+require a fresh read. See `macos/README.md` for the workflow and limits.

@@ -36,18 +36,21 @@ struct StudioView: View {
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {
-                        Text("CODEX").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(accent)
-                        Text("第 1 层 · 13 个可配置按键").foregroundStyle(.secondary).font(.caption)
+                        Text(model.layerTitle(model.selectedLayer)).font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(accent)
+                        Text("第 \(model.selectedLayer.rawValue + 1) 层 · 13 个可配置按键").foregroundStyle(.secondary).font(.caption)
                         Spacer()
                         Text(model.dirty || model.ledDirty ? "有未保存修改" : "已同步").font(.caption).foregroundStyle(.secondary)
                     }
+                    Picker("编辑层", selection: $model.selectedLayer) {
+                        ForEach(model.availableLayers) { Text(model.layerTitle($0)).tag($0) }
+                    }.pickerStyle(.segmented).disabled(model.busy)
                     board
                     HStack(spacing: 16) {
                         Label("点选按键以修改动作", systemImage: "cursorarrow.click")
                         Spacer()
                         Text("RP2040 / OAI").fontDesign(.monospaced)
                     }.font(.caption).foregroundStyle(.secondary)
-                    Text("FN、NAV、MEDIA 的键位仍由固件定义。当前 RPC 仅支持 CODEX 层的 OAI 动作映射。").font(.caption).foregroundStyle(.secondary).lineSpacing(4)
+                    Text(model.extendedSupported ? "四层分别保存。选择编辑层不会切换设备当前层；TP5 负责实际切层。层指示灯颜色随设备当前层显示。" : "当前设备固件仅支持 CODEX 编辑；请升级至 v0014 以配置其余三层和层指示灯。").font(.caption).foregroundStyle(.secondary).lineSpacing(4)
                 }.frame(maxWidth: .infinity)
                 inspector.frame(width: 285)
             }.padding(28)
@@ -94,7 +97,7 @@ struct StudioView: View {
                 Spacer()
                 Text("3D 实物视图").font(.caption).foregroundStyle(.secondary)
             }.font(.callout.weight(.medium))
-            HardwareRenderView(map: model.map, selected: model.selected,
+            HardwareRenderView(map: model.displayMap, selected: model.selected,
                                dark: colorScheme == .dark, enabled: !model.busy) { model.selected = $0 }
                 .frame(height: 430)
                 .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -112,14 +115,18 @@ struct StudioView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Divider()
-            Text("分配 Codex 动作").font(.caption).foregroundStyle(.secondary)
-            Picker("动作", selection: Binding(get: { model.map.values[model.selected] }, set: { model.assign($0) })) {
-                ForEach(PadAction.editable) { Text($0.title).tag($0.id) }
-            }.labelsHidden()
-            Text(PadAction.all[model.map.values[model.selected]].wire)
+            Text("分配按键功能").font(.caption).foregroundStyle(.secondary)
+            Picker("动作", selection: Binding(get: { model.selectedAction }, set: { model.assign($0) })) {
+                ForEach(model.actions) { Text($0.title).tag($0.id) }
+            }.labelsHidden().disabled(!model.canEditLayer)
+            Text(model.displayMap.action(at: model.selected).wire)
                 .font(.system(size: 11, design: .monospaced)).foregroundStyle(accent)
             Text(actionHelp).font(.caption).foregroundStyle(.secondary).lineSpacing(4).frame(minHeight: 72, alignment: .top)
             Divider()
+            ColorPicker("\(model.layerTitle(model.selectedLayer)) 层指示灯", selection: Binding(get: { model.indicatorColor }, set: { model.indicatorColor = $0 }), supportsOpacity: false)
+                .disabled(!model.extendedSupported)
+            Text("TP5 指示灯 · 黑色关闭此层指示。颜色与键位一起通过“保存到设备”写入；全局开关和亮度通过“应用灯光”写入。")
+                .font(.caption).foregroundStyle(.secondary)
             lighting
             Divider()
             Label("固定硬件行为", systemImage: "lock").font(.caption.bold())
@@ -170,7 +177,12 @@ struct StudioView: View {
         }
     }
     private var actionHelp: String {
-        switch model.map.values[model.selected] {
+        if model.selectedLayer != .codex { return "此功能仅在 \(model.layerTitle(model.selectedLayer)) 层生效。“沿用 CODEX 此键”会执行该物理按键的 CODEX 动作。" }
+        let selected = model.selectedAction
+        if model.inputKeymapSupported && !(82..<98).contains(selected) {
+            return "原生按键在此层直接发送，不依赖 Codex 握手。选择 Codex 动作可恢复相应的 OAI 控制。"
+        }
+        switch model.inputKeymapSupported ? selected - 82 : selected {
         case 10: return "SAFE 的解锁状态由固件计时，松开后清除。"
         case 11: return "ACT10 具有确认保护：短按不触发；保持 600 ms 后松开，或先由 SAFE 解锁。"
         case 3: return "新建任务；原生快捷键回退模式下，长按可切换会话。"

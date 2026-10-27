@@ -26,9 +26,9 @@ recovery. No physical check is PASS until a person has observed it on the
 board.
 
 Current build candidate:
-`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `94208` bytes,
+`release/firmware/prebuilt/agentpad13_codex_oai.uf2`, UF2 `119808` bytes,
 SHA-256
-`247ef9253d81aa36ee39c971a86beb73772c151d7937745e901622e63e64a3d7`.
+`eb462190390f01ddbf819da7c2d6d20b806df4de9099a40b7dc34f4225492aff`.
 
 ## Pre-flight, manual only
 
@@ -49,12 +49,17 @@ SHA-256
 |---|---|---|
 | BOOTSEL recovery | PENDING | Recovery route works and normal firmware can be restored. |
 | USB 303A:8360 / FF00:61 / report 6 | PENDING | Host observes the expected keyboard plus Raw HID endpoint. |
+| Input 1.0.2 key editing | PENDING | Read keymap.json, add layers 5 through 16, change bindings, save and verify key output/cycling after restart; verify all layers in Studio. |
+| AgentPad Studio regression | PENDING | Connect, save/read back CODEX and all auxiliary layers, indicator colors and LED settings; repeat after restart. |
+| Multiple HID clients | PENDING | Observe Input, Studio and Codex together; check for request-ID collisions or interleaved fragments before claiming concurrent operation. |
 | rgbcfg + thstatus + device.status | PENDING | The three OAI RPC acknowledgements arrive once and readiness changes; an empty `thstatus` array is a valid no-op handshake. |
 | power-on LED sweep 1→24 | PENDING | White dot visits every LED in chain order, then two green completion flashes. |
 | CODEX boot layer | PENDING | After the 2.28-second sweep, LED 13 is red and the active layer is CODEX/OAI even if FN/NAV/MEDIA was active before USB was disconnected. TP5 is deliberately ignored during that sweep, then resumes its normal cycle. |
 | keymap.get default | PENDING | `123456789abecd1` is returned for layer 0; position 11 uses the combined-microphone `e` compatibility action, and the encoder is at position 13. |
 | keymap.set + persistence | PENDING | A valid 15-digit map ACKs, survives reconnect, and invalid maps are rejected atomically. |
 | led settings + persistence | PENDING | The app can change LED power and brightness, read the values back, and recover the same values after a power cycle; invalid values are rejected atomically. |
+| four-layer edits + persistence | PENDING | Edit each of CODEX/FN/NAV/MEDIA, save/read back, power-cycle and verify each layer. Hold a remapped native key, change layer with TP5, then release and verify no stuck key. |
+| custom layer indicator colors | PENDING | Assign four distinct colors and verify LED 13 follows TP5's active layer before and after OAI readiness and power cycling. Black disables that layer indicator; global enable and brightness still apply. |
 | AG00..AG05 | PENDING | Each grid agent key produces its matching press notification; release remains intentionally silent. |
 | ACT06..ACT12 | PENDING | Matrix/function positions produce their matching press/release notifications; ACT10 is protected ACCEPT, the factory microphone action also emits ACT10, ACT11 is available by selecting `f`, and ACT12 is SEND. |
 | ENC / ENC_CW / ENC_CC | PENDING | Encoder press and both directions produce the allowlisted notifications. |
@@ -63,7 +68,7 @@ SHA-256
 | FN F2 and NAV TP_TOG | PENDING | FN emits F2; `TP_TOG` is on NAV so touch can be disabled and re-enabled without losing the layer-cycle mapping. |
 | slot LEDs 0..5 | PENDING | Six independent task slots show their received RGB/effect states. |
 | action LEDs 6..12 | PENDING | Physical function keys at positions 6..12 flash white for approximately 160 ms; AG00..AG05 task positions do not flash. |
-| TP5/layer LED 13 | PENDING | The LED always identifies CODEX/FN/NAV/MEDIA as red/yellow/green/cyan, including before OAI readiness or after an error; optional animation may only pulse brightness. |
+| TP5/layer LED 13 | PENDING | The LED follows each layer's configured RGB color, including before OAI readiness or after an error; factory colors are red/yellow/green/cyan. Optional animation may only pulse brightness. |
 | underglow 14..23 | PENDING | Underglow follows the selected/working task at reduced intensity. |
 | restore normal firmware | PENDING | Approved normal default or Vial firmware is restored and re-enumerates normally. |
 

@@ -469,7 +469,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 // ---------------------------------------------------------------------------
 // Joystick modes. Native QMK exposes GP26/GP27 as a HID gamepad; the arrow
 // (8-way) and scroll modes are custom code reading analogReadPin. JS_MODE
-// cycles gamepad -> arrows -> scroll, with an optional Codex session-navigation
+// cycles gamepad -> arrows -> scroll, with an optional Codex layer-navigation
 // mode. All modes share ONE calibration source: the per-axis js_center_* /
 // js_threshold_* derived above from the EEPROM store (protocol v1), which fall
 // back to the 512/300 placeholders on an uncalibrated board.
@@ -478,16 +478,16 @@ enum js_mode {
     JS_MODE_GAMEPAD = 0,
     JS_MODE_ARROWS,
     JS_MODE_SCROLL,
-#ifdef CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
-    JS_MODE_SESSIONS,
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
+    JS_MODE_LAYERS,
 #endif
     JS_MODE_COUNT,
 };
 
 #define JS_SCROLL_INTERVAL_MS 120
 
-#ifdef CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
-static uint8_t js_mode = JS_MODE_SESSIONS;
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
+static uint8_t js_mode = JS_MODE_LAYERS;
 #else
 static uint8_t js_mode = JS_MODE_GAMEPAD;
 #endif
@@ -515,13 +515,13 @@ static void js_read_physical_axes(int16_t *x, int16_t *y, int16_t *center_x, int
 // arrow order: up, down, left, right
 static const uint16_t js_arrow_kc[4] = {KC_UP, KC_DOWN, KC_LEFT, KC_RIGHT};
 static bool           js_arrow_held[4];
-static int8_t         js_session_direction;
+static int8_t         js_layer_direction;
 
-__attribute__((weak)) void loudest_joystick_session_step(int8_t direction) {
+__attribute__((weak)) void loudest_joystick_layer_step(int8_t direction) {
     (void)direction;
 }
 
-#ifdef CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
 static int16_t js_abs_delta(int16_t value) {
     return value < 0 ? (int16_t)-value : value;
 }
@@ -544,8 +544,8 @@ static void js_release_arrows(void) {
 }
 
 static const uint8_t js_mode_order[] = {
-#ifdef CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
-    JS_MODE_SESSIONS,
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
+    JS_MODE_LAYERS,
 #endif
     JS_MODE_ARROWS,
     JS_MODE_SCROLL,
@@ -554,7 +554,7 @@ static const uint8_t js_mode_order[] = {
 
 static void js_cycle_mode(void) {
     js_release_arrows();
-    js_session_direction = 0;
+    js_layer_direction = 0;
     uint8_t current = 0;
     uint8_t mode_count = (uint8_t)(sizeof(js_mode_order) / sizeof(js_mode_order[0]));
     for (uint8_t i = 0; i < mode_count; i++) {
@@ -951,7 +951,13 @@ void matrix_scan_kb(void) {
     matrix_scan_user();
 }
 
+#ifdef CODEX_PAD_CONFIGURABLE
+bool codex_pad_process_record(keyrecord_t *record);
+#endif
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+#ifdef CODEX_PAD_CONFIGURABLE
+    if (!codex_pad_process_record(record)) return false;
+#endif
     // Swallow the touch key entirely (press and release) while touch is disabled.
     if (record->event.key.row == TOUCH_MATRIX_ROW && record->event.key.col == TOUCH_MATRIX_COL && !touch_enabled && keycode != TP_TOG) {
         return false;
@@ -1029,9 +1035,9 @@ void housekeeping_task_kb(void) {
                     last_scroll = timer_read32();
                 }
             }
-#ifdef CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS
-        } else if (js_mode == JS_MODE_SESSIONS && get_highest_layer(layer_state | default_layer_state) == CODEX_OAI_JOYSTICK_ACTIVE_LAYER) {
-            int16_t trigger = threshold_x + CODEX_OAI_SESSION_DEADZONE;
+#ifdef CODEX_OAI_DEFAULT_JOYSTICK_LAYERS
+        } else if (js_mode == JS_MODE_LAYERS) {
+            int16_t trigger = threshold_x + CODEX_OAI_LAYER_DEADZONE;
             trigger         = trigger > 512 ? 512 : trigger;
             int8_t direction = 0;
             if (x > center_x + trigger) {
@@ -1039,12 +1045,12 @@ void housekeeping_task_kb(void) {
             } else if (x < center_x - trigger) {
                 direction = 1;
             }
-            if (direction != 0 && js_session_direction == 0) {
-                js_session_direction = direction;
+            if (direction != 0 && js_layer_direction == 0) {
+                js_layer_direction = direction;
                 js_note_output_activity();
-                loudest_joystick_session_step(direction);
-            } else if (direction == 0 && js_session_direction != 0 && js_abs_delta(x - center_x) < threshold_x) {
-                js_session_direction = 0;
+                loudest_joystick_layer_step(direction);
+            } else if (direction == 0 && js_layer_direction != 0 && js_abs_delta(x - center_x) < threshold_x) {
+                js_layer_direction = 0;
             }
 #endif
         }

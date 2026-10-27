@@ -3,6 +3,7 @@
 #include "codex_oai.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "raw_hid.h"
@@ -166,6 +167,52 @@ typedef struct {
     uint8_t brightness;
     uint8_t checksum;
 } oai_led_store_t;
+
+// Four 13-action/3-RGB-byte records. Keep existing keymap and LED stores intact.
+#define PAD_CONFIG_ADDRESS 112U
+#define PAD_CONFIG_SIZE 16U
+#define PAD_ACTION_COUNT 168U
+#include "input_storage.inc"
+static const uint8_t pad_factory[OAI_MAX_LAYERS][PAD_CONFIG_SIZE] = {
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0},
+    {2,5,6,7,8,9,10,11,12,13,14,15,30,255,192,0},
+    {16,17,18,19,20,21,22,23,24,25,26,3,1,0,255,0},
+    {27,28,29,30,31,32,33,34,35,36,37,38,1,0,255,192},
+};
+static uint8_t pad_config[OAI_MAX_LAYERS][PAD_CONFIG_SIZE];
+static uint8_t pad_checksum(const uint8_t *bytes) {
+    uint8_t sum = 0xCA;
+    for (uint8_t i = 0; i < 64; ++i) sum = (uint8_t)((sum << 1) ^ (sum >> 7) ^ bytes[i]);
+    return sum;
+}
+static bool pad_persist(const uint8_t *bytes) {
+    return input_persist(bytes, NULL, 0);
+}
+static void pad_load(void) {
+    memcpy(pad_config, pad_factory, sizeof(pad_config));
+#if defined(CODEX_OAI_HAS_WEAR_LEVELING)
+    uint8_t store[67] = {0};
+    if (wear_leveling_read(PAD_CONFIG_ADDRESS, store, sizeof(store)) == WEAR_LEVELING_SUCCESS
+        && store[0] == 0xCA && store[1] == 1 && store[66] == pad_checksum(store + 2)) {
+        bool valid = true;
+        for (uint8_t l = 0; l < 4; ++l)
+            for (uint8_t p = 0; p < 13; ++p) valid &= store[2 + l * 16 + p] < PAD_ACTION_COUNT;
+        if (valid) memcpy(pad_config, store + 2, 64);
+    }
+#endif
+    (void)input_load(&pad_config[0][0]);
+}
+uint8_t codex_pad_action(uint8_t layer, uint8_t position) {
+    return layer < codex_pad_layer_count() && position < 13 ? pad_config[layer][position] : 0;
+}
+void codex_pad_color(uint8_t layer, uint8_t *r, uint8_t *g, uint8_t *b) {
+    if (layer >= codex_pad_layer_count()) return;
+    *r = pad_config[layer][13]; *g = pad_config[layer][14]; *b = pad_config[layer][15];
+}
+void codex_pad_reset(void) {
+    memcpy(pad_config, pad_factory, sizeof(pad_config));
+    (void)pad_persist(&pad_config[0][0]);
+}
 
 static bool is_space(char value) {
     return value == ' ' || value == '\t' || value == '\r' || value == '\n';
@@ -335,7 +382,10 @@ void codex_oai_init(void) {
     handshake_revision = 0;
     last_event_was_error = false;
     keymap_load();
+    pad_load();
     led_load();
+    input_writing = false;
+    input_pending_length = 0;
 }
 
 void codex_oai_reset_keymap(void) {
@@ -397,6 +447,7 @@ bool codex_oai_keymap_set(const uint8_t input[OAI_KEYMAP_POSITION_COUNT]) {
     }
 #endif
     memcpy(oai_keymap, input, OAI_KEYMAP_POSITION_COUNT);
+    ++input_config_revision;
     return true;
 }
 
@@ -1050,7 +1101,7 @@ static bool parse_keymap_params(
     size_t end,
     bool require_map,
     uint32_t *layer,
-    char map[OAI_KEYMAP_POSITION_COUNT + 1]
+    char *map, size_t map_length, uint32_t max_layer
 ) {
     size_t cursor = skip_space(input, end, start);
     if (cursor >= end || input[cursor++] != '{') {
@@ -1073,15 +1124,16 @@ static bool parse_keymap_params(
             return false;
         }
         if (strcmp(key, "l") == 0) {
-            if (has_layer || !parse_u32(input, end, &cursor, layer, 0U)) {
+            if (has_layer || !parse_u32(input, end, &cursor, layer, max_layer)) {
                 return false;
             }
             has_layer = true;
         } else if (strcmp(key, "m") == 0) {
-            if (has_map || map == NULL || !parse_plain_string(input, end, &cursor, map, OAI_KEYMAP_POSITION_COUNT + 1)) {
+            cursor = skip_space(input, end, cursor);
+            if (has_map || map == NULL || !parse_plain_string(input, end, &cursor, map, map_length + 1)) {
                 return false;
             }
-            if (strlen(map) != OAI_KEYMAP_POSITION_COUNT) {
+            if (strlen(map) != map_length) {
                 return false;
             }
             has_map = true;
@@ -1280,15 +1332,15 @@ static uint8_t append_id(
 }
 
 static void send_response(const char *prefix, uint16_t id) {
-    uint8_t report[OAI_REPORT_SIZE] = {0};
-    uint8_t offset = 3;
-    report[0] = OAI_REPORT_ID;
-    report[1] = OAI_CHANNEL_RPC;
-    offset = append_text(report, offset, prefix);
-    offset = append_id(report, offset, id);
-    offset = append_text(report, offset, "}\r\n");
-    report[2] = (uint8_t)(offset - 3);
-    raw_hid_send(report, OAI_REPORT_SIZE);
+    char json[128];
+    int length = snprintf(json, sizeof(json), "%s%u}\r\n", prefix, (unsigned)id);
+    if (length < 0 || (size_t)length >= sizeof(json)) return;
+    for (int start = 0; start < length; start += OAI_MAX_PAYLOAD) {
+        uint8_t report[OAI_REPORT_SIZE] = {OAI_REPORT_ID, OAI_CHANNEL_RPC};
+        report[2] = (uint8_t)((length - start) > OAI_MAX_PAYLOAD ? OAI_MAX_PAYLOAD : length - start);
+        memcpy(report + 3, json + start, report[2]);
+        raw_hid_send(report, OAI_REPORT_SIZE);
+    }
 }
 
 static void send_keymap_get_response(uint16_t id, const char map[OAI_KEYMAP_POSITION_COUNT + 1]) {
@@ -1328,12 +1380,65 @@ static void send_led_get_response(uint16_t id) {
     raw_hid_send(report, OAI_REPORT_SIZE);
 }
 
+static void send_config_response(uint16_t id, uint8_t layer) {
+    char json[100];
+    char hex[33];
+    for (uint8_t i = 0; i < 16; ++i) {
+        hex[i * 2] = hex_digit(pad_config[layer][i] >> 4);
+        hex[i * 2 + 1] = hex_digit(pad_config[layer][i] & 15);
+    }
+    hex[32] = 0;
+    int length = snprintf(json, sizeof(json), "{\"result\":{\"l\":%u,\"m\":\"%s\"},\"id\":%u}\r\n", layer, hex, id);
+    for (int start = 0; start < length; start += 61) {
+        uint8_t report[OAI_REPORT_SIZE] = {OAI_REPORT_ID, OAI_CHANNEL_RPC};
+        report[2] = (uint8_t)((length - start) > 61 ? 61 : length - start);
+        memcpy(report + 3, json + start, report[2]);
+        raw_hid_send(report, sizeof(report));
+    }
+}
+
+#include "input_keymap.inc"
+
 static bool dispatch_request(const char *input, size_t length) {
     oai_request_t request;
     if (!parse_request(input, length, &request)) {
         return false;
     }
-    if (strcmp(request.method, "v.oai.rgbcfg") == 0) {
+    if (strcmp(request.method, "v.agentpad.cfg.info") == 0) {
+        input_json_invalid=false;
+        input_json_t params={request.params_start,request.params_end};
+        input_json_t n=input_field(input,params,"n");
+        uint32_t count=0;
+        if (input_json_invalid || (n.end && (!input_number(input,n,&count,OAI_MAX_LAYERS) || count<4 || !input_resize((uint8_t)count,pad_config)))) {
+            input_error(request.id); return true;
+        }
+        char prefix[64];
+        snprintf(prefix,sizeof(prefix),"{\"result\":{\"n\":%u,\"max\":%u},\"id\":",codex_pad_layer_count(),OAI_MAX_LAYERS);
+        send_response(prefix,request.id);
+    } else if (strcmp(request.method, "v.agentpad.cfg.get") == 0 || strcmp(request.method, "v.agentpad.cfg.set") == 0) {
+        bool writing = strcmp(request.method, "v.agentpad.cfg.set") == 0;
+        uint32_t layer = 0;
+        char hex[33];
+        uint8_t next[OAI_MAX_LAYERS][16];
+        memcpy(next, pad_config, sizeof(next));
+        bool valid = parse_keymap_params(input, request.params_start, request.params_end, writing, &layer, hex, 32, codex_pad_layer_count() - 1);
+        if (valid && writing) {
+            for (uint8_t i = 0; i < 16; ++i) {
+                int8_t hi = hex_digit_value(hex[i * 2]), lo = hex_digit_value(hex[i * 2 + 1]);
+                if (hi < 0 || lo < 0) { valid = false; break; }
+                next[layer][i] = (uint8_t)((hi << 4) | lo);
+                if (i < 13 && (next[layer][i] >= PAD_ACTION_COUNT || next[layer][i] == 95)) valid = false;
+            }
+            if (valid) valid = pad_persist(&next[0][0]);
+            if (valid) memcpy(pad_config, next, sizeof(next));
+        }
+        if (!valid) {
+            send_response("{\"error\":\"invalid_config\",\"id\":", request.id);
+            return false;
+        }
+        if (writing) send_response("{\"result\":true,\"id\":", request.id);
+        else send_config_response(request.id, (uint8_t)layer);
+    } else if (strcmp(request.method, "v.oai.rgbcfg") == 0) {
         saw_rgbcfg = true;
         ++handshake_revision;
         if (handshake_revision == 0U) handshake_revision = 1U;
@@ -1346,12 +1451,19 @@ static bool dispatch_request(const char *input, size_t length) {
         } else {
             return false;
         }
-    } else if (strcmp(request.method, "device.status") == 0) {
-        send_response("{\"result\":{},\"id\":", request.id);
+    } else if (strcmp(request.method, "device.status") == 0 || strcmp(request.method, "sys.version") == 0) {
+        send_response("{\"result\":{\"version\":\"" OAI_FIRMWARE_VERSION "\"},\"id\":", request.id);
+    } else if (strcmp(request.method, "host.focused_app") == 0) {
+        /* Single-profile firmware accepts host context without switching maps. */
+        send_response("{\"result\":true,\"id\":", request.id);
+    } else if (strncmp(request.method, "fs.", 3) == 0) {
+        return input_fs_request(input, &request);
+    } else if (strcmp(request.method, "sys.bootloader") == 0) {
+        send_response("{\"error\":{\"code\":-32601,\"message\":\"Unsupported on AgentPad13\"},\"id\":", request.id);
     } else if (strcmp(request.method, "v.oai.keymap.get") == 0) {
         uint32_t layer = 0;
         char map[OAI_KEYMAP_POSITION_COUNT + 1];
-        if (!parse_keymap_params(input, request.params_start, request.params_end, false, &layer, map)) {
+        if (!parse_keymap_params(input, request.params_start, request.params_end, false, &layer, map, OAI_KEYMAP_POSITION_COUNT, 0U)) {
             send_response("{\"error\":\"invalid_keymap\",\"id\":", request.id);
             return false;
         }
@@ -1362,7 +1474,7 @@ static bool dispatch_request(const char *input, size_t length) {
         uint32_t layer = 0;
         char map[OAI_KEYMAP_POSITION_COUNT + 1];
         if (
-            !parse_keymap_params(input, request.params_start, request.params_end, true, &layer, map)
+            !parse_keymap_params(input, request.params_start, request.params_end, true, &layer, map, OAI_KEYMAP_POSITION_COUNT, 0U)
             || layer != 0U
             || !codex_oai_keymap_set_hex(map, OAI_KEYMAP_POSITION_COUNT)
         ) {

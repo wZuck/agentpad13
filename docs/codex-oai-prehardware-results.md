@@ -527,4 +527,40 @@ On the next boot, firmware recognizes the exact previous factory record
 including maps that intentionally contain `f`, are preserved. The application
 also uses `123456789abecd1` for its factory reset and documents both choices.
 The migration and wire behavior are covered by the host protocol harness;
-physical voice activation and the rebuilt UF2 remain **PENDING** validation.
+physical voice activation and the updated UF2 remain **PENDING** validation.
+
+
+## 2026-10-27 — joystick layer navigation
+
+The default Codex joystick mode now cycles the visible layers on every layer:
+left selects the previous layer, right selects the next, with wraparound.
+A held deflection or direct reversal does not repeat; passing through the
+centre deadzone re-arms it. Vertical input is ignored. TP5 still cycles forward,
+and the active-layer LED uses the same selection path for both inputs.
+The startup LED self-check blocks both layer inputs. FN's `JS_MODE` cycles
+`layers -> arrows -> scroll -> gamepad`.
+
+The rebuild uses local QMK GCC 15.2.0 (the same toolchain as the four-layer
+configuration build), rather than the release builder's pinned GCC 15.2.1.
+Pinned Vial-QMK source and patches, strict lint, and clean default/Vial/Codex
+builds pass. The host gate passes 121 tests. The current UF2 and its exact
+hash are recorded in `firmware/evidence/codex-oai-current-manifest.json`;
+`firmware/evidence/codex-oai-emulator.json` records the USB and joystick checks.
+No physical firmware installation was performed; physical checks remain pending.
+
+
+## 2026-10-28 — Input keymap adapter
+
+The v001C OAI target exposes a bounded `keymap.json` over the Input 1.0.2
+filesystem RPCs, translates four to sixteen layers into the same persistent
+records used by Studio, and supports native CODEX overrides. Legacy layer
+records and calibration/OAI/LED stores retain their addresses. Input bytes
+and metadata are read back exactly for SHA-1 verification; Studio changes
+regenerate the virtual file. Unsupported macros, profiles and fixed-control
+changes are rejected. See `docs/input-compatibility.zh-CN.md` for limits.
+
+Validation covers the installed Input model/serializer, real C transfer and
+persistence, Swift Studio requests, and the UF2 USB/key-scan emulator.
+Builds use the existing local GCC 15.2.0 and pinned Vial source/patches.
+Current binary provenance remains in the current manifest and emulator JSON.
+No physical flash or app installation was performed.

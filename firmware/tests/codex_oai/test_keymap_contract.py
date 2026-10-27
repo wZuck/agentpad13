@@ -41,8 +41,8 @@ class KeymapContractTest(unittest.TestCase):
         for name, definition in (
             ("VENDOR_ID", "#define VENDOR_ID 0x303A"),
             ("PRODUCT_ID", "#define PRODUCT_ID 0x8360"),
-            ("DEVICE_VER", "#define DEVICE_VER 0x0013"),
-            ("MANUFACTURER", "#define MANUFACTURER \"hirlu\""),
+            ("DEVICE_VER", "#define DEVICE_VER 0x001C"),
+            ("MANUFACTURER", "#define MANUFACTURER \"ZiyiWang\""),
             ("PRODUCT", "#define PRODUCT \"Codex Micro Lab OAI LED\""),
             ("RAW_USAGE_PAGE", "#define RAW_USAGE_PAGE 0xFF00"),
             ("RAW_USAGE_ID", "#define RAW_USAGE_ID 0x61"),
@@ -125,8 +125,8 @@ class KeymapContractTest(unittest.TestCase):
         self.assertIn("codex_oai_reset_led()", self.keymap)
 
     def test_two_default_layers_are_table_driven_and_extensible(self) -> None:
-        self.assertRegex(self.keymap, r"define CODEX_EXTRA_LAYERS\s+2")
-        self.assertIn("#define CODEX_LAYER_COUNT (2 + CODEX_EXTRA_LAYERS)", self.keymap)
+        self.assertIn("CODEX_LAYER_COUNT OAI_MAX_LAYERS", self.keymap)
+        self.assertIn("codex_pad_layer_count()", self.keymap)
         self.assertIn("L_CODEX = 0", self.keymap)
         self.assertIn("#define CODEX_OAI_LAYER L_CODEX", self.keymap)
         self.assertIn("select_codex_layer(CODEX_OAI_LAYER)", self.keymap)
@@ -134,10 +134,9 @@ class KeymapContractTest(unittest.TestCase):
         self.assertIn("L_USER2", self.keymap)
         self.assertIn("L_USER3", self.keymap)
         self.assertIn("L_USER4", self.keymap)
-        self.assertIn("CODEX_EXTRA_LAYERS > 3", self.keymap)
-        self.assertIn("codex_layer_order[CODEX_LAYER_COUNT]", self.keymap)
+        self.assertIn("[15] = LAYOUT", self.keymap)
+        self.assertIn("%count", self.keymap)
         self.assertNotIn("_CODEX_ARMED", self.keymap)
-        self.assertNotIn("layer_on(", self.keymap)
 
     def test_boot_clears_both_qmk_layer_state_sources_to_codex(self) -> None:
         """A persisted non-CODEX default layer must not override layer_move(0)."""
@@ -159,7 +158,7 @@ class KeymapContractTest(unittest.TestCase):
         for token in (
             "CODEX_TOUCH_LAYER",
             "case CODEX_TOUCH_LAYER:",
-            "cycle_codex_layer();",
+            "step_codex_layer(1);",
             "[L_USER2] = LAYOUT(",
             "[L_USER3] = LAYOUT(",
         ):
@@ -184,7 +183,7 @@ class KeymapContractTest(unittest.TestCase):
         assert touch_case is not None
         body = touch_case.group(1)
         self.assertIn("pressed && !codex_led_startup_active(timer_read32())", body)
-        self.assertIn("cycle_codex_layer();", body)
+        self.assertIn("step_codex_layer(1);", body)
 
     def test_encoder_press_is_oai_only_on_every_layer(self) -> None:
         layouts = re.findall(
@@ -202,7 +201,7 @@ class KeymapContractTest(unittest.TestCase):
         end = self.keymap.index("if (action == OAI_KEYMAP_SEND", start)
         handler = self.keymap[start:end]
         self.assertIn("notify_encoder_press(pressed)", handler)
-        self.assertNotIn("cycle_codex_layer()", handler)
+        self.assertNotIn("step_codex_layer", handler)
         self.assertNotIn("select_codex_layer", handler)
         self.assertNotIn("eeconfig_update_user", handler)
 
@@ -237,25 +236,26 @@ class KeymapContractTest(unittest.TestCase):
             with self.subTest(mapping=mapping):
                 self.assertIn(source, body)
 
-    def test_codex_layer_joystick_uses_session_navigation(self) -> None:
+    def test_joystick_cycles_layers_from_every_layer(self) -> None:
         config = (REPO / "firmware" / "loudest_micro" / "keymaps" / "codex_oai" / "config.h").read_text()
         source = (REPO / "firmware" / "loudest_micro" / "loudest_micro.c").read_text()
 
-        self.assertIn("#define CODEX_OAI_DEFAULT_JOYSTICK_SESSIONS", config)
-        self.assertIn("#define CODEX_OAI_JOYSTICK_ACTIVE_LAYER 0", config)
+        self.assertIn("#define CODEX_OAI_DEFAULT_JOYSTICK_LAYERS", config)
+        self.assertNotIn("CODEX_OAI_JOYSTICK_ACTIVE_LAYER", source)
         self.assertIn("#define CODEX_OAI_JOYSTICK_SWAP_XY", config)
-        self.assertIn("#define CODEX_OAI_SESSION_DEADZONE 40", config)
+        self.assertIn("#define CODEX_OAI_LAYER_DEADZONE 40", config)
         self.assertNotIn("CODEX_OAI_DEFAULT_JOYSTICK_MOUSE", config)
         self.assertIn("*x           = raw_y;", source)
         self.assertIn("*y           = raw_x;", source)
-        self.assertIn("js_mode == JS_MODE_SESSIONS", source)
+        self.assertIn("js_mode == JS_MODE_LAYERS", source)
         self.assertIn("JS_MODE_ARROWS", source)
         self.assertNotIn("JS_MODE_MOUSE", source)
         self.assertNotIn("QK_MOUSE_CURSOR", source)
         self.assertIn("!loudest_joystick_is_deflected()", self.keymap)
         self.assertIn("!loudest_joystick_was_recently_deflected(750)", self.keymap)
-        self.assertIn("loudest_joystick_session_step(direction);", self.common)
-        self.assertIn("OAI_CONTROL_AG00 : OAI_CONTROL_AG01", self.keymap)
+        self.assertIn("loudest_joystick_layer_step(direction);", self.common)
+        self.assertIn("step_codex_layer(direction);", self.keymap)
+        self.assertNotIn("OAI_CONTROL_AG00 : OAI_CONTROL_AG01", self.keymap)
 
     def test_native_fallback_and_safety_contract(self) -> None:
         for token in (

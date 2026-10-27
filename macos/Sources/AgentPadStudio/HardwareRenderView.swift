@@ -235,11 +235,11 @@ final class PadSceneView: SCNView {
             rings[index].geometry?.firstMaterial = glow
             let legend = SCNMaterial()
             legend.lightingModel = .constant
-            legend.diffuse.contents = legendTexture(index: index, action: PadAction.all[map.values[index]], lightInk: dark && !active)
+            legend.diffuse.contents = legendTexture(index: index, action: map.action(at: index), lightInk: dark && !active)
             legend.transparencyMode = .aOne
             legend.writesToDepthBuffer = false
             legends[index].geometry?.firstMaterial = legend
-            accessibleKeys[index].setAccessibilityLabel("SW\(index + 1)，\(PadAction.all[map.values[index]].title)")
+            accessibleKeys[index].setAccessibilityLabel("SW\(index + 1)，\(map.action(at: index).title)")
             accessibleKeys[index].setAccessibilityValue(active ? "已选中" : "")
             accessibleKeys[index].setAccessibilityEnabled(editingEnabled)
         }
@@ -261,8 +261,8 @@ final class PadSceneView: SCNView {
             ])
         }
         text("SW\(index + 1)", size: 58, y: 355, weight: .regular)
-        let titles = ["无操作", "上个会话", "下个会话", "新建任务", "审查", "计划", "实现", "重构", "测试", "中止", "解锁", "确认", "发送", "编码器", "麦克风", "麦克风"]
-        text(titles[action.id], size: 91, y: 175, weight: .semibold)
+        let title = action.keycapTitle
+        text(title, size: min(91, (width - 30) / CGFloat(max(title.count, 1))), y: 175, weight: .semibold)
         text(action.wire.components(separatedBy: " · ").first ?? "", size: 54, y: 55, weight: .medium)
         image.unlockFocus()
         return image
