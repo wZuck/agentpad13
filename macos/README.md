@@ -1,5 +1,7 @@
 # AgentPad Studio and Input
 
+[简体中文](README.zh-CN.md) | English
+
 Use AgentPad Studio and Input to configure the same AgentPad13 device. Both work
 with the experimental `codex_oai` firmware; no conversion between apps is needed.
 

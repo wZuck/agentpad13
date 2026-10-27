@@ -1,5 +1,7 @@
 # AgentPad Studio — Design and Development
 
+[简体中文](DESIGN.zh-CN.md) | English
+
 This document describes the native macOS application and its interface to the
 AgentPad13 `codex_oai` firmware. For app selection and configuration steps, see
 the [README](README.md).
