@@ -58,7 +58,8 @@ factor; flatness of the mating face is.
 
 ## Keep-outs
 
-- **BOOT / RESET service slots**, x 59.0..76.0, y 83.3..93.3 mm. If
+- **BOOT / RESET service slots**, x 59.0..76.5, y 82.8..93.8 mm. SW15/RESET
+  carries the larger 1.0 mm service clearance; SW14/BOOT remains at 0.5 mm. If
   your base covers this area it **must** carry a through window. A base that
   stays inside **Ø78.36 mm**
   about the datum never reaches it.

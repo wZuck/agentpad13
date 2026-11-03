@@ -3143,3 +3143,16 @@ cylinders widened from Ø4.2 to Ø4.7. The assembly gate remains **status ok,
 104/104 assertions passed**. The new limiting calculated wall at the notched
 (3.7, 3.7) boss is **1.4012 mm**. This CAD result still requires the usual
 first-article heat-set test on the target printer and PETG.
+
+## 34. Dedicated SW15/RESET tray opening (2026-11-03)
+
+The tray's two service cuts are now deliberately asymmetric by function:
+SW14/BOOT retains the established 0.5 mm clearance around its STEP envelope,
+while SW15/RESET receives 1.0 mm. The rightmost tact is selected from the two
+PTS645 envelopes and asserted against the board-truth x = 72.5 mm coordinate,
+so a future component-order change cannot silently enlarge the wrong opening.
+
+This turns SW15 into an explicit, comfortably reachable reset opening instead
+of relying on the two nearly tangent generic service cuts. The cut remains a
+rounded, full-thickness tray-floor opening; no boss, base-mount pocket, board
+support, outline, screw path, or PCB coordinate changes.

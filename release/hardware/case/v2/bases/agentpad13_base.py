@@ -379,9 +379,11 @@ def print_pose(part, deg):
 def _service_window():
     """Union bbox of the tray's own two service slots, relieved."""
     xs, ys = [], []
-    for (_lbl, x0, x1, y0, y1, _z0, _z1) in C._TACTS:
-        xs += [x0 - C.SVC_CLEAR, x1 + C.SVC_CLEAR]
-        ys += [y0 - C.SVC_CLEAR, y1 + C.SVC_CLEAR]
+    for rec in C._TACTS:
+        _lbl, x0, x1, y0, y1, _z0, _z1 = rec
+        clear = C._service_clearance(rec)
+        xs += [x0 - clear, x1 + clear]
+        ys += [y0 - clear, y1 + clear]
     return (min(xs) - SVC_WINDOW_RELIEF, max(xs) + SVC_WINDOW_RELIEF,
             min(ys) - SVC_WINDOW_RELIEF, max(ys) + SVC_WINDOW_RELIEF)
 
@@ -868,10 +870,13 @@ if __name__ == "__main__":
 
     # ---- keep-outs the contract must publish -----------------------------
     svc_r = svc_corner_radius()
-    raw_slot_r = min(math.hypot(px - DATUM[0], py - DATUM[1])
-                     for (_l, x0, x1, y0, y1, _z0, _z1) in C._TACTS
-                     for px in (x0 - C.SVC_CLEAR, x1 + C.SVC_CLEAR)
-                     for py in (y0 - C.SVC_CLEAR, y1 + C.SVC_CLEAR))
+    raw_slot_r = min(
+        math.hypot(px - DATUM[0], py - DATUM[1])
+        for rec in C._TACTS
+        for (_l, x0, x1, y0, y1, _z0, _z1) in (rec,)
+        for clear in (C._service_clearance(rec),)
+        for px in (x0 - clear, x1 + clear)
+        for py in (y0 - clear, y1 + clear))
     print(f"[keepout] BOOT/RESET slots: nearest tray-slot corner {raw_slot_r:.3f} mm "
           f"from the datum (relieved window corner {svc_r:.3f}) -> a windowless "
           f"circular base caps at Ø{2*raw_slot_r:.2f}")
@@ -906,9 +911,11 @@ if __name__ == "__main__":
     # builds it — pass windows=True) and is a design change, not a tweak.
     true_slot_r = min(
         math.hypot(cx - DATUM[0], cy - DATUM[1]) - C.SVC_TOOL_R
-        for (_l, x0, x1, y0, y1, _z0, _z1) in C._TACTS
-        for cx in (x0 - C.SVC_CLEAR + C.SVC_TOOL_R, x1 + C.SVC_CLEAR - C.SVC_TOOL_R)
-        for cy in (y0 - C.SVC_CLEAR + C.SVC_TOOL_R, y1 + C.SVC_CLEAR - C.SVC_TOOL_R))
+        for rec in C._TACTS
+        for (_l, x0, x1, y0, y1, _z0, _z1) in (rec,)
+        for clear in (C._service_clearance(rec),)
+        for cx in (x0 - clear + C.SVC_TOOL_R, x1 + clear - C.SVC_TOOL_R)
+        for cy in (y0 - clear + C.SVC_TOOL_R, y1 + clear - C.SVC_TOOL_R))
     assert PED_D / 2.0 < raw_slot_r, (
         f"PEDESTAL FAIL (HARD): Ø{PED_D} reaches {PED_D/2:.3f} and the nearest "
         f"BOOT/RESET slot corner is {raw_slot_r:.3f} — the base would COVER the "
@@ -1168,10 +1175,15 @@ if __name__ == "__main__":
             "keep_outs": {
                 "service_slots": {
                     "what": "BOOT / RESET tact access, pierced through the tray floor",
-                    "tray_slot_bbox": [round(min(x0 - C.SVC_CLEAR for (_l, x0, x1, y0, y1, _a, _b) in C._TACTS), 2),
-                                       round(max(x1 + C.SVC_CLEAR for (_l, x0, x1, y0, y1, _a, _b) in C._TACTS), 2),
-                                       round(min(y0 - C.SVC_CLEAR for (_l, x0, x1, y0, y1, _a, _b) in C._TACTS), 2),
-                                       round(max(y1 + C.SVC_CLEAR for (_l, x0, x1, y0, y1, _a, _b) in C._TACTS), 2)],
+                    "tray_slot_bbox": [
+                        round(min(rec[1] - C._service_clearance(rec)
+                                  for rec in C._TACTS), 2),
+                        round(max(rec[2] + C._service_clearance(rec)
+                                  for rec in C._TACTS), 2),
+                        round(min(rec[3] - C._service_clearance(rec)
+                                  for rec in C._TACTS), 2),
+                        round(max(rec[4] + C._service_clearance(rec)
+                                  for rec in C._TACTS), 2)],
                     "rule": "any base covering this area MUST carry a through "
                             "window; a base that stays inside Ø"
                             f"{2*raw_slot_r:.1f} about the datum never reaches it",

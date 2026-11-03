@@ -76,9 +76,9 @@
         "what": "BOOT / RESET tact access, pierced through the tray floor",
         "tray_slot_bbox": [
           59.0,
-          76.0,
-          83.3,
-          93.3
+          76.5,
+          82.8,
+          93.8
         ],
         "rule": "any base covering this area MUST carry a through window; a base that stays inside \u00d878.4 about the datum never reaches it",
         "max_windowless_circular_base_mm": 78.36

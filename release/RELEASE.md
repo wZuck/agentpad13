@@ -515,12 +515,13 @@ interferences : 11 (the documented model set)
 [v2.5-JS-KEYCAP] js_sweep x keycaps overlap = 0.00 mm^3 ;
                  taper wall -> SW4 keycap edge (22.7) clearance = +0.293 mm
 ```
-The insert revision changes only four tray cavities, Ø4.2 → Ø4.7 mm. The tray
-STL remains one valid watertight solid with the same exterior bounding box;
-its measured volume loss agrees with the four-cylinder prediction within mesh
-tessellation error. The selected STL is `6d18c6e62eef4e63b6576d635829a1a3`.
-The STEP source imports as one valid solid at 38594.881521 mm³ and matches the
-selected development artifact in volume, bounding box, face count, and topology.
+The insert revision changes four tray cavities, Ø4.2 → Ø4.7 mm. On 2026-11-03
+the tray also gained an explicit SW15/RESET service opening: SW14 retains
+0.5 mm clearance around its STEP envelope, while SW15 is enlarged to 1.0 mm.
+The tray STL remains one valid watertight solid with the same exterior bounding
+box. The selected STL is `40e43cd94303af542a0a780453508980`.
+The STEP source imports as one valid solid at 38529.944945 mm³; the 64.936577
+mm³ change is confined to the added SW15 clearance.
 The limiting calculated wall at the notched boss is 1.4012 mm. This still needs
 a first-article heat-set test in the builder's PETG and printer.
 

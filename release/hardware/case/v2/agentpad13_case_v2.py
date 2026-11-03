@@ -985,6 +985,11 @@ NOTCH_Z0 = -1.85           # [v2.10] BACK to the v2.2 board-passage-only
 #                            arithmetic in _boss_notches() is z-independent,
 #                            so notch_insert_wall stays 1.4012.
 SVC_CLEAR = 0.5            # service slot clearance around the tact solids [S]
+SVC_CLEAR_SW15 = 1.0       # RESET gets explicit tool/finger clearance; the
+#                            original 0.5 mm envelope already opened the floor,
+#                            but left SW15 visually merged into the BOOT slot.
+#                            Keep SW14 at 0.5 mm and enlarge only the rightmost
+#                            tact (board truth: SW15 @ x=72.5, y=88.3).
 SVC_TOOL_R = 1.0           # slot corner R: at R1.0/0.5 the corner arc clears
 #                            the tact box corner (R1.5/0.4 clipped it by 0.06,
 #                            khana-caught as a 0.02 mm^3 sliver)
@@ -1223,6 +1228,14 @@ Z_INSERT_BOT = CAP_Z0 - M3_INSERT_DEPTH           # -4.2
 # The two service tacts, straight from the fresh STEP envelopes [S].
 _TACTS = [c for c in PCB.COMPONENTS if c[0].startswith("SW_SPST_PTS645")]
 assert len(_TACTS) == 2, f"expected 2 PTS645 tacts in the STEP, got {len(_TACTS)}"
+_SW15_TACT = max(_TACTS, key=lambda rec: (rec[1] + rec[2]) / 2.0)
+assert abs((_SW15_TACT[1] + _SW15_TACT[2]) / 2.0 - 72.5) < 0.1, (
+    "SW15 service-slot selector no longer lands at board x=72.5")
+
+
+def _service_clearance(rec):
+    """Per-switch tray opening clearance; SW15 is the rightmost service tact."""
+    return SVC_CLEAR_SW15 if rec == _SW15_TACT else SVC_CLEAR
 
 # v2.9 base-interface derived + invariants (printed in __main__ as [v2.9-BASE]).
 Z_BASE_MOUNT_TOP = Z_TRAY_BOT + BASE_MOUNT_DEPTH      # v2.11: -7.9 (was -5.9)
@@ -1252,9 +1265,11 @@ for (_mx, _my) in BASE_MOUNT_XY:
         assert _d >= BASE_MOUNT_KEEPOUT, (
             f"BASE MOUNT FAIL: pocket ({_mx:.1f},{_my:.1f}) is {_d:.3f} from "
             f"the corner boss at ({_cx},{_cy}) < {BASE_MOUNT_KEEPOUT}")
-    for (_l, _x0, _x1, _y0, _y1, _z0, _z1) in _TACTS:  # service slots (thru)
-        _sx0, _sx1 = _x0 - SVC_CLEAR, _x1 + SVC_CLEAR
-        _sy0, _sy1 = _y0 - SVC_CLEAR, _y1 + SVC_CLEAR
+    for _rec in _TACTS:                                  # service slots (thru)
+        _l, _x0, _x1, _y0, _y1, _z0, _z1 = _rec
+        _clear = _service_clearance(_rec)
+        _sx0, _sx1 = _x0 - _clear, _x1 + _clear
+        _sy0, _sy1 = _y0 - _clear, _y1 + _clear
         _dx = max(_sx0 - _mx, 0.0, _mx - _sx1)
         _dy = max(_sy0 - _my, 0.0, _my - _sy1)
         _d = math.hypot(_dx, _dy) - BASE_MOUNT_D / 2
@@ -1985,9 +2000,12 @@ def tray():
                * Rot(Z=ang) * Box(12.0, 12.0, z1 - NOTCH_Z0))
               & _z_cyl(BOSS_OD, NOTCH_Z0, z1, bx, by))
     # Service slots over the two tacts: fresh-STEP envelope + clearance [S].
+    # SW15/RESET is selected explicitly above and receives 1.0 mm clearance;
+    # SW14/BOOT keeps the established 0.5 mm opening.
     for rec in _TACTS:
         _lbl, x0, x1, y0, y1, _z0, _z1 = rec
-        t -= _rprism((x1 - x0) + 2 * SVC_CLEAR, (y1 - y0) + 2 * SVC_CLEAR,
+        clear = _service_clearance(rec)
+        t -= _rprism((x1 - x0) + 2 * clear, (y1 - y0) + 2 * clear,
                      SVC_TOOL_R, Z_TRAY_BOT - _OVER, Z_FLOOR_TOP + _OVER,
                      (x0 + x1) / 2, (y0 + y1) / 2)
     # v2.9 BASE MOUNT interface: four blind Ø6.0 x 1.6 pockets in the tray's
